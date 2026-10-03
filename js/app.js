@@ -19,7 +19,7 @@ import { PetManager } from './engine/PetManager.js';
 import { StudyTimer } from './engine/StudyTimer.js';
 import { KnowledgeEngine } from './knowledge/KnowledgeEngine.js';
 import { profileStorage } from './storage/ProfileStorage.js';
-import { NetworkMesh } from './network/NetworkMesh.js';
+import { NetworkMesh } from './network/NetworkMesh.js?v=6.3';
 
 class BiboApp {
   constructor() {
@@ -1373,5 +1373,6 @@ class BiboApp {
 // Start application when DOM is ready
 window.addEventListener('DOMContentLoaded', () => {
   const app = new BiboApp();
+  window.app = app;
   app.init();
 });

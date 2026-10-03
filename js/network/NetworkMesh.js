@@ -9,7 +9,8 @@ export class NetworkMesh {
     this.roomId = roomId;
 
     this.localPeerId = this._generatePeerId();
-    this.activePeers = new Map(); // peerId -> { source, lastSeen }
+    this.activePeers = new Map(); // sovereignPeerId -> { lastSeen, trysteroIds: Set }
+    this.peerTransports = new Map(); // trysteroPeerId -> sovereignPeerId
     this.seenMessages = new Set();
     this.messageHistory = [];
     this.maxSeenCache = 1000;
@@ -53,17 +54,10 @@ export class NetworkMesh {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun.cloudflare.com:3478' },
-        { urls: 'stun:openrelay.metered.ca:80' },
-        {
-          urls: [
-            'turn:openrelay.metered.ca:80',
-            'turn:openrelay.metered.ca:443',
-            'turn:openrelay.metered.ca:443?transport=tcp'
-          ],
-          username: 'openrelayproject',
-          credential: 'openrelayprojectsecret'
-        }
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        { urls: 'stun:stun.cloudflare.com:3478' }
       ],
       iceCandidatePoolSize: 4
     };
@@ -77,34 +71,21 @@ export class NetworkMesh {
     const nostrRelays = [
       'wss://nos.lol',
       'wss://nostr.mom',
-      'wss://relay.snort.social',
-      'wss://nostr.wine',
       'wss://relay.primal.net',
-      'wss://purplerelay.com'
-    ];
-
-    const turnConfig = [
-      {
-        urls: [
-          'turn:openrelay.metered.ca:80',
-          'turn:openrelay.metered.ca:443',
-          'turn:openrelay.metered.ca:443?transport=tcp'
-        ],
-        username: 'openrelayproject',
-        credential: 'openrelayprojectsecret'
-      }
+      'wss://purplerelay.com',
+      'wss://relay.snort.social'
     ];
 
     await Promise.allSettled([
-      this._initStrategy('torrent', '../vendor/trystero-torrent.js', torrentRelays, rtcConfig, turnConfig),
-      this._initStrategy('nostr', '../vendor/trystero-nostr.js', nostrRelays, rtcConfig, turnConfig)
+      this._initStrategy('torrent', '../vendor/trystero-torrent.js', torrentRelays, rtcConfig),
+      this._initStrategy('nostr', '../vendor/trystero-nostr.js', nostrRelays, rtcConfig)
     ]);
 
     this._startHeartbeat();
     console.log('[NetworkMesh] Multi-signaling & Gossip engine initialized.');
   }
 
-  async _initStrategy(type, modulePath, relays, rtcConfig, turnConfig) {
+  async _initStrategy(type, modulePath, relays, rtcConfig) {
     try {
       const trystero = await import(modulePath);
       if (!trystero || !trystero.joinRoom) return;
@@ -114,7 +95,7 @@ export class NetworkMesh {
         relayUrls: relays,
         relayConfig: { urls: relays },
         rtcConfig,
-        turnConfig
+        trickleIce: true
       };
 
       const room = trystero.joinRoom(config, this.roomId);
@@ -138,39 +119,30 @@ export class NetworkMesh {
       room._rawSend = sendGossip;
 
       const handleJoin = (trysteroPeerId) => {
-        console.log(`[NetworkMesh] Peer joined on ${type}: ${trysteroPeerId}`);
-        // Immediately record active peer so peer count updates instantly
-        this.activePeers.set(trysteroPeerId, {
-          source: type,
-          trysteroId: trysteroPeerId,
-          lastSeen: Date.now()
-        });
-        this._updatePeerMetrics();
-
-        // Broadcast full state with localPeerId so the new peer can immediately register us
+        console.log(`[NetworkMesh] WebRTC channel joined on ${type}: ${trysteroPeerId}`);
+        // Immediately broadcast full state and request sync so sovereign ID is registered
         this.broadcastState();
+        this._emitGossip('REQUEST_SYNC', { senderId: this.localPeerId });
 
-        // Also schedule a secondary sync after 350ms to ensure WebRTC DataChannel has flushed
         setTimeout(() => {
           this.broadcastState();
-          this._emitGossip('REQUEST_SYNC', { senderId: this.localPeerId });
-        }, 350);
+        }, 400);
       };
 
       const handleLeave = (trysteroPeerId) => {
-        console.log(`[NetworkMesh] Peer left on ${type}: ${trysteroPeerId}`);
-        // Find if this trysteroPeerId maps to a sovereign senderId
-        let foundSender = null;
-        for (const [peerId, meta] of this.activePeers.entries()) {
-          if (meta.trysteroId === trysteroPeerId || peerId === trysteroPeerId) {
-            foundSender = peerId;
-            break;
+        console.log(`[NetworkMesh] WebRTC channel left on ${type}: ${trysteroPeerId}`);
+        const sovereignId = this.peerTransports.get(trysteroPeerId);
+        if (sovereignId) {
+          this.peerTransports.delete(trysteroPeerId);
+          const peer = this.activePeers.get(sovereignId);
+          if (peer && peer.trysteroIds) {
+            peer.trysteroIds.delete(trysteroPeerId);
+            // Only drop the sovereign peer if ALL transport connections (torrent + nostr) have closed
+            if (peer.trysteroIds.size === 0) {
+              this.activePeers.delete(sovereignId);
+              this._updatePeerMetrics();
+            }
           }
-        }
-        const targetId = foundSender || trysteroPeerId;
-        if (this.activePeers.has(targetId)) {
-          this.activePeers.delete(targetId);
-          this._updatePeerMetrics();
         }
       };
 
@@ -202,9 +174,13 @@ export class NetworkMesh {
       const liveTrysteroPeers = new Set([...activeTorrentPeers, ...activeNostrPeers]);
 
       for (const [peerId, meta] of this.activePeers.entries()) {
-        const isStillConnected = meta.trysteroId && liveTrysteroPeers.has(meta.trysteroId);
-        // Only prune if peer is not connected via WebRTC AND hasn't sent heartbeat for 45s
-        if (!isStillConnected && (now - meta.lastSeen > 45000)) {
+        // Prune peer if inactive for 20 seconds
+        if (now - meta.lastSeen > 20000) {
+          if (meta.trysteroIds) {
+            for (const tid of meta.trysteroIds) {
+              this.peerTransports.delete(tid);
+            }
+          }
           this.activePeers.delete(peerId);
           changed = true;
         }
@@ -214,6 +190,13 @@ export class NetworkMesh {
       }
 
       this._emitGossip('HEARTBEAT', { senderId: this.localPeerId, timestamp: now });
+
+      // When solo in mesh, periodically broadcast state and request sync to catch asynchronous joins
+      if (this.activePeers.size === 0 && (!this._lastSoloSync || now - this._lastSoloSync > 16000)) {
+        this._lastSoloSync = now;
+        this.broadcastState();
+        this._emitGossip('REQUEST_SYNC', { senderId: this.localPeerId });
+      }
     }, this.heartbeatIntervalMs);
 
     // Register beforeunload and pagehide to broadcast instant peer departure
@@ -260,13 +243,20 @@ export class NetworkMesh {
 
     const actualSender = (packet.payload && packet.payload.senderId) || senderId || 'peer';
     if (actualSender && actualSender !== this.localPeerId) {
-      // If we previously recorded by raw trysteroId, replace with sovereign actualSender
-      if (senderId && senderId !== actualSender && this.activePeers.has(senderId)) {
-        this.activePeers.delete(senderId);
+      if (senderId) {
+        this.peerTransports.set(senderId, actualSender);
       }
-      const isNew = !this.activePeers.has(actualSender);
-      this.activePeers.set(actualSender, { source: 'gossip', trysteroId: senderId, lastSeen: Date.now() });
-      if (isNew) {
+      const existing = this.activePeers.get(actualSender);
+      if (existing) {
+        existing.lastSeen = Date.now();
+        if (senderId && existing.trysteroIds) existing.trysteroIds.add(senderId);
+      } else {
+        const trysteroIds = new Set();
+        if (senderId) trysteroIds.add(senderId);
+        this.activePeers.set(actualSender, {
+          lastSeen: Date.now(),
+          trysteroIds
+        });
         this._updatePeerMetrics();
       }
     }
@@ -276,6 +266,12 @@ export class NetworkMesh {
         break;
       case 'PEER_LEAVE':
         if (actualSender && this.activePeers.has(actualSender)) {
+          const peer = this.activePeers.get(actualSender);
+          if (peer && peer.trysteroIds) {
+            for (const tid of peer.trysteroIds) {
+              this.peerTransports.delete(tid);
+            }
+          }
           this.activePeers.delete(actualSender);
           this._updatePeerMetrics();
         }
