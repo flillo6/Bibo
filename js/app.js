@@ -875,9 +875,9 @@ class BiboApp {
     const renderOnboardSuggestions = (query) => {
       onboardTopicSuggestions.innerHTML = '';
       const q = (query || '').toLowerCase().trim();
-      const baseTopics = this.knowledge.verifiedPool.map(item => item.topic);
-      const customTopics = this.profile.customTopics || [];
-      const allTopics = Array.from(new Set([...baseTopics, ...customTopics]));
+      const baseTopics = this.knowledge.getTopicsList(i18n.locale);
+      const customTopics = (this.profile.customTopics || []).map(t => typeof t === 'string' ? t : (t[i18n.locale] || t.it || t.en || ''));
+      const allTopics = Array.from(new Set([...baseTopics, ...customTopics])).filter(Boolean);
       const filtered = q ? allTopics.filter(t => t.toLowerCase().includes(q)) : allTopics;
 
       if (filtered.length === 0) {
@@ -1134,9 +1134,9 @@ class BiboApp {
 
     const q = (query || '').toLowerCase().trim();
     // Unique list of topics from knowledge base and custom user topics
-    const baseTopics = this.knowledge.verifiedPool.map(item => item.topic);
-    const customTopics = this.profile.customTopics || [];
-    const allTopics = Array.from(new Set([...baseTopics, ...customTopics]));
+    const baseTopics = this.knowledge.getTopicsList(i18n.locale);
+    const customTopics = (this.profile.customTopics || []).map(t => typeof t === 'string' ? t : (t[i18n.locale] || t.it || t.en || ''));
+    const allTopics = Array.from(new Set([...baseTopics, ...customTopics])).filter(Boolean);
 
     const filtered = q ? allTopics.filter(t => t.toLowerCase().includes(q)) : allTopics;
 

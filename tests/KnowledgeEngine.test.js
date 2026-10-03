@@ -66,3 +66,25 @@ test('KnowledgeEngine - Approccio 3 Translation Bounty Bridge', () => {
   assert.equal(updated.question.en, 'What is a prokaryotic cell?');
   assert.equal(updated.answer.en, 'A bacterium');
 });
+
+test('KnowledgeEngine - Resolves unique localized topic lists cleanly without [object Object]', () => {
+  localStorage.clear();
+  const ke = new KnowledgeEngine();
+
+  const itTopics = ke.getTopicsList('it');
+  assert.ok(itTopics.length >= 3);
+  itTopics.forEach(t => {
+    assert.equal(typeof t, 'string');
+    assert.notEqual(t, '[object Object]');
+    assert.ok(t.length > 0);
+  });
+  assert.ok(itTopics.includes('Chimica Generale'));
+
+  const enTopics = ke.getTopicsList('en');
+  assert.ok(enTopics.length >= 3);
+  enTopics.forEach(t => {
+    assert.equal(typeof t, 'string');
+    assert.notEqual(t, '[object Object]');
+  });
+  assert.ok(enTopics.includes('General Chemistry'));
+});

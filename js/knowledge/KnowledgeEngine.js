@@ -81,6 +81,21 @@ export class KnowledgeEngine {
   }
 
   /**
+   * Retrieves unique localized topic names from verified pool
+   */
+  getTopicsList(locale = (typeof i18n !== 'undefined' ? i18n.locale : 'it')) {
+    const set = new Set();
+    const l = (locale === 'en') ? 'en' : 'it';
+    this.verifiedPool.forEach(item => {
+      const resolved = this._resolveText(item.topic, l);
+      if (resolved && resolved.trim()) {
+        set.add(resolved.trim());
+      }
+    });
+    return Array.from(set);
+  }
+
+  /**
    * Retrieves a verified quiz matching the given topic and language
    */
   getQuizForTopic(topicName, locale = (i18n ? i18n.locale : 'it')) {
