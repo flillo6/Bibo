@@ -344,6 +344,9 @@ export class PetManager {
     this.reactionTimeout = setTimeout(() => {
       this._updateAnimationState();
     }, durationMs);
+    if (typeof this.reactionTimeout.unref === 'function') {
+      this.reactionTimeout.unref();
+    }
   }
 
   /**

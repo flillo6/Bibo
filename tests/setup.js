@@ -1,6 +1,6 @@
 /**
  * Test Environment Setup for Node.js Native Runner
- * Shims localStorage and minimal browser APIs for headless domain unit testing.
+ * Shims localStorage and unrefs background handles for clean test exits.
  */
 
 class MockLocalStorage {
@@ -25,7 +25,15 @@ if (!globalThis.localStorage) {
   globalThis.localStorage = new MockLocalStorage();
 }
 
-// Minimal window/i18n mock if not present
-if (!globalThis.window) {
-  globalThis.window = globalThis;
+// Unref Node.js BroadcastChannel so unit tests exit instantaneously without hanging the event loop
+if (globalThis.BroadcastChannel) {
+  const OrigBC = globalThis.BroadcastChannel;
+  globalThis.BroadcastChannel = class extends OrigBC {
+    constructor(name) {
+      super(name);
+      if (typeof this.unref === 'function') {
+        this.unref();
+      }
+    }
+  };
 }
