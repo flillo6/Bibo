@@ -64,8 +64,9 @@ export class SpriteAnimationPlayer {
                        anim !== CONFIG.ANIMATIONS.VICTORY_HOP;
         const isSleep = anim === CONFIG.ANIMATIONS.SLEEP;
         const loopStartFrame = isSleep ? 9 : 0;
-        const yOffset = isSleep ? 30 : 0;
-        const groundY = isSleep ? 437 : 452;
+        const isBaby = (evo === 'baby');
+        const yOffset = (isBaby && isSleep) ? 30 : 0;
+        const groundY = isBaby ? (isSleep ? 437 : 452) : (isSleep ? 488 : 491);
         const shadowScaleX = isSleep ? 0.44 : 0.33;
         const shadowScaleY = isSleep ? 12 : 9;
 
@@ -125,7 +126,7 @@ export class SpriteAnimationPlayer {
         }
         resolve(false);
       };
-      img.src = `${imgUrl}?v=2.5`;
+      img.src = `${imgUrl}?v=5.5`;
     });
   }
 
