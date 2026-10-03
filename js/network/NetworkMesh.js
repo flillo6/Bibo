@@ -69,7 +69,10 @@ export class NetworkMesh {
 
     const torrentRelays = [
       'wss://tracker.openwebtorrent.com',
-      'wss://tracker.webtorrent.dev'
+      'wss://tracker.webtorrent.dev',
+      'wss://tracker.btorrent.xyz',
+      'wss://tracker.files.fm:7073/announce',
+      'wss://open.ftorrent.com'
     ];
 
     const nostrRelays = [
@@ -77,7 +80,9 @@ export class NetworkMesh {
       'wss://nostr.mom',
       'wss://relay.snort.social',
       'wss://nostr.wine',
-      'wss://relay.primal.net'
+      'wss://relay.primal.net',
+      'wss://relay.damus.io',
+      'wss://purplerelay.com'
     ];
 
     const turnConfig = [
@@ -142,9 +147,17 @@ export class NetworkMesh {
       };
 
       const handleLeave = (trysteroPeerId) => {
-        // Trystero ephemeral connection dropped
-        if (this.activePeers.has(trysteroPeerId)) {
-          this.activePeers.delete(trysteroPeerId);
+        // Find if this trysteroPeerId maps to a sovereign senderId
+        let foundSender = null;
+        for (const [peerId, meta] of this.activePeers.entries()) {
+          if (meta.trysteroId === trysteroPeerId) {
+            foundSender = peerId;
+            break;
+          }
+        }
+        const targetId = foundSender || trysteroPeerId;
+        if (this.activePeers.has(targetId)) {
+          this.activePeers.delete(targetId);
           this._updatePeerMetrics();
         }
       };
@@ -223,7 +236,7 @@ export class NetworkMesh {
     const actualSender = (packet.payload && packet.payload.senderId) || senderId || 'peer';
     if (actualSender && actualSender !== this.localPeerId) {
       const isNew = !this.activePeers.has(actualSender);
-      this.activePeers.set(actualSender, { source: 'gossip', lastSeen: Date.now() });
+      this.activePeers.set(actualSender, { source: 'gossip', trysteroId: senderId, lastSeen: Date.now() });
       if (isNew) {
         this._updatePeerMetrics();
       }

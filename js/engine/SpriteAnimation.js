@@ -54,6 +54,7 @@ export class SpriteAnimationPlayer {
     // 2. Pre-register all canonical animations across all 3 evolutions (baby, mid, adult)
     const allEvos = ['baby', 'mid', 'adult'];
     const allAnims = Object.values(CONFIG.ANIMATIONS);
+    const loadPromises = [];
 
     for (const evo of allEvos) {
       for (const anim of allAnims) {
@@ -73,25 +74,28 @@ export class SpriteAnimationPlayer {
         const shadowScaleX = isSleep ? 0.44 : (isBaby ? 0.33 : 0.38);
         const shadowScaleY = isSleep ? 12 : (isBaby ? 9 : 11);
 
-        this.loadSprite(evo, anim, `assets/sprites/${evo}/${anim}.png`, {
-          frameCount: 12,
-          frameWidth: 512,
-          frameHeight: 512,
-          fps: CONFIG.FRAME_RATE,
-          loop: isLoop,
-          loopStartFrame: loopStartFrame,
-          scale: scale,
-          yOffset: yOffset,
-          groundY: groundY,
-          shadowScaleX: shadowScaleX,
-          shadowScaleY: shadowScaleY,
-          silentFallback: true
-        });
+        loadPromises.push(
+          this.loadSprite(evo, anim, `assets/sprites/${evo}/${anim}.png`, {
+            frameCount: 12,
+            frameWidth: 512,
+            frameHeight: 512,
+            fps: CONFIG.FRAME_RATE,
+            loop: isLoop,
+            loopStartFrame: loopStartFrame,
+            scale: scale,
+            yOffset: yOffset,
+            groundY: groundY,
+            shadowScaleX: shadowScaleX,
+            shadowScaleY: shadowScaleY,
+            silentFallback: true
+          })
+        );
       }
     }
 
+    await Promise.all(loadPromises);
     this.isLoaded = true;
-    console.log('[SpriteAnimation] Animation pipeline initialized with all 9 canonical animations at 5 FPS.');
+    console.log('[SpriteAnimation] Animation pipeline initialized with all canonical animations loaded.');
   }
 
   /**
@@ -237,8 +241,8 @@ export class SpriteAnimationPlayer {
     const isSleep = (meta.groundY === 437 || meta.groundY === 495);
     const shadowX = width / 2;
     const isBaby = (meta.groundY === 452 || meta.groundY === 437);
-    // User requirement: For Evo 2 (mid) and Evo 3 (adult), shadow must go lower down (+14px under contact)
-    const evoOffsetY = isSleep ? 0 : (isBaby ? 3 : 14);
+    // User requirement: For Evo 2 (mid) and Evo 3 (adult), shadow slightly higher than before (+8px under contact)
+    const evoOffsetY = isSleep ? 0 : (isBaby ? 3 : 8);
     const shadowY = Math.min(height - 10, sneakerGroundY + evoOffsetY);
     const shadowRadiusX = targetWidth * (meta.shadowScaleX || 0.33);
     const shadowRadiusY = meta.shadowScaleY || 9;

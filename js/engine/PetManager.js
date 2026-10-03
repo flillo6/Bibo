@@ -97,7 +97,10 @@ export class PetManager {
           this.energy = p.energy;
           this.cleanliness = p.cleanliness;
           this.state = p.state;
-          this.activeEvolution = 'baby';
+          if (p.evo && ['baby', 'mid', 'adult'].includes(p.evo)) {
+            this.activeEvolution = p.evo;
+            if (this.anim) this.anim.setEvolution(p.evo);
+          }
           this._updateAnimationState();
           this._notify(false); // Update UI without re-broadcasting loop
         }
