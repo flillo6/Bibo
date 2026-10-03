@@ -177,28 +177,26 @@ bibo/
 ├── manifest.json                # Configurazione Web App PWA
 ├── package.json                 # Modulo ES e script di test
 ├── sw.js                        # Service Worker (Cache-First offline)
-└── README.md                    # Documentazione tecnica e STAR guide
+└── README.md                    # Documentazione tecnica e decisioni architetturali
 ```
 
 ---
 
-## 💼 STAR Interview Guide (CV & Colloqui da Tech Lead)
+## 🏛️ Ingegneria del Software & Decisioni Architetturali
 
-Se presenti questo progetto nel tuo portfolio, CV o durante colloqui tecnici:
-
-* **S (Situation):** Gli studenti universitari soffrono di isolamento durante le sessioni di studio profondo e tendono a distrarsi con app di produttività sovraccariche di notifiche e gamification tossica. I servizi multiplayer tradizionali richiedono server cloud costosi (WebSocket, Redis, DB) che rendono i progetti indipendenti insostenibili (€200-800/mese).
-* **T (Task):** Architettare un assistente di studio minimalista ispirato al Tamagotchi e alla Calm Computing con architettura a costo operativo zero (€0 OpEx), in grado di sincronizzare studenti a livello globale senza server centralizzati e con footprint CPU/GPU prossimo allo zero.
-* **A (Action):**
-  * Realizzato un motore Canvas 2D bloccato a 15 FPS discrete integrato con la **Page Visibility API** per azzerare l'uso della CPU quando la scheda è in background.
-  * Sviluppato un **Audio Synthesizer procedurale** tramite la Web Audio API (rumore Brown filtrato, pioggia bicanale, click fisici meccanici) eliminando completamente il download di file audio via CDN.
-  * Architettato un protocollo di validazione delle conoscenze basato su **Byzantine Fault Tolerance (soglia 67%)** e un ponte di traduzione decentralizzato.
-  * Implementato un sistema di identità sovrana locale (**Local-First**) con chiavi di ripristino mnemonico a 3 parole (Sovereign Storage).
-  * Connesso un mesh di rete decentralizzato **P2P WebRTC (Trystero / Nostr)** con riconciliazione dati CRDT a costo zero.
-  * Configurato Service Worker PWA per l'esecuzione offline su dispositivi mobili (iOS Safari e Android).
-* **R (Result):**
-  * **0,00 € di costi per sempre** (nessun server, nessun database a pagamento, nessuna API a gettone).
-  * Tempo di avvio inferiore a 50ms (da cache PWA) e footprint di memoria < 30MB.
-  * 13 test automatizzati passati su 13 con CI/CD GitHub Actions e deployment automatico.
+* **Problem Statement:** Gli strumenti di studio tradizionali soffrono di due estremi: app sovraccariche di notifiche e gamification distratta, oppure backend centralizzati con costi operativi ricorrenti (WebSocket, Redis, database cloud da €200-800/mese) che rendono i progetti indipendenti insostenibili.
+* **Obiettivi Progettuali:** Realizzare un compagno di studio minimalista conforme ai principi della *Calm Computing*, con sovranità totale dell'utente sui propri dati (*Local-First*), sincronizzazione globale a costo operativo zero (€0 OpEx) e footprint CPU/RAM minimo.
+* **Soluzioni Ingegneristiche Adottate:**
+  * **Zero-Idle CPU Footprint:** Rendering Canvas 2D a 15 FPS discrete sincronizzato con la `Page Visibility API`, sospendendo ogni ciclo di elaborazione quando la finestra o la scheda è in background.
+  * **Sintesi Audio Procedurale:** Sintetizzatore Web Audio nativo che genera rumore Brown filtrato, pioggia bicanale e click fisici in tempo reale senza consumare banda di rete o scaricare file audio.
+  * **Consenso Distribuito BFT (67%):** Protocollo di validazione della conoscenza anti-Sybil ispirato al Byzantine Fault Tolerance con ponte di traduzione asincrono tra studenti di diverse lingue.
+  * **Identità Sovrana:** Autenticazione crittografica deterministica a 3 parole mnemoniche, svincolata da account terzi o database centrali.
+  * **Rete Mesh P2P:** Sincronizzazione in tempo reale via WebRTC DataChannel e relay Nostr pubblici senza alcuna infrastruttura server proprietaria.
+  * **PWA Offline-First:** Service Worker con strategia Cache-First per garantire avvio istantaneo e funzionamento continuo anche in aereo o offline.
+* **Metriche & Risultati:**
+  * **0,00 € di costi operativi per sempre** (nessun server a pagamento, nessun database cloud, nessuna API commerciale a consumo).
+  * **Avvio istantaneo < 50ms** e footprint di memoria < 30MB su desktop e mobile.
+  * **100% test passati** (13/13 test automatizzati in 70ms su pipeline CI/CD GitHub Actions).
 
 ---
 
