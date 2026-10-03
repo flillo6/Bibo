@@ -257,11 +257,25 @@ export class PetManager {
     if (this.reactionTimeout) {
       clearTimeout(this.reactionTimeout);
       this.reactionTimeout = null;
+  }
+  this.state = 'AWAKE';
+  this._saveVitals();
+  this._updateAnimationState();
+  this._notify();
+}
+
+  /**
+   * Set active evolution stage for testing and progression
+   */
+  setEvolutionStage(evoKey) {
+    if (['baby', 'mid', 'adult'].includes(evoKey)) {
+      this.activeEvolution = evoKey;
+      if (this.anim) {
+        this.anim.setEvolution(evoKey);
+      }
+      this._updateAnimationState();
+      this._notify(true);
     }
-    this.state = 'AWAKE';
-    this._saveVitals();
-    this._updateAnimationState();
-    this._notify();
   }
 
   /**

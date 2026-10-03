@@ -51,8 +51,8 @@ export class SpriteAnimationPlayer {
       scale: 1.0
     });
 
-    // 2. Pre-register all canonical animations across active evolutions (baby for now)
-    const allEvos = ['baby'];
+    // 2. Pre-register all canonical animations across all 3 evolutions (baby, mid, adult)
+    const allEvos = ['baby', 'mid', 'adult'];
     const allAnims = Object.values(CONFIG.ANIMATIONS);
 
     for (const evo of allEvos) {

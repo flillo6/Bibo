@@ -20,7 +20,7 @@
   <script>
     // Sovereign PWA instant upgrade engine (purges legacy caches automatically)
     (function() {
-      const BUILD = 'v5.3';
+      const BUILD = 'v5.4';
       if (localStorage.getItem('bibo_build_version') !== BUILD) {
         localStorage.setItem('bibo_build_version', BUILD);
         if ('caches' in window) {
@@ -38,7 +38,7 @@
     })();
   </script>
 
-  <link rel="stylesheet" href="css/style.css?v=5.3">
+  <link rel="stylesheet" href="css/style.css?v=5.4">
 </head>
 <body>
 
@@ -76,6 +76,21 @@
     <div class="pet-container" id="biboContainer">
       <div id="speechBubble" class="speech-bubble">Ehi! Stai studiando, non toccarmi.</div>
       <canvas id="biboCanvas" width="380" height="380"></canvas>
+    </div>
+
+    <!-- TEMPORARY TEST CONTROLS (TEST EVO 2 & 3 + ANIMAZIONI) -->
+    <div id="evoTestBar" class="evo-test-bar">
+      <span class="evo-test-title">[ TEST EVO ]:</span>
+      <button class="evo-test-btn active" data-evo="baby">BABY (1)</button>
+      <button class="evo-test-btn" data-evo="mid">MID (2)</button>
+      <button class="evo-test-btn" data-evo="adult">ADULT (3)</button>
+      <span class="evo-test-divider">|</span>
+      <button class="anim-test-btn" data-anim="idle_base">IDLE</button>
+      <button class="anim-test-btn" data-anim="eat_biscuit">BISCOTTO</button>
+      <button class="anim-test-btn" data-anim="clean_sponge">SPUGNA</button>
+      <button class="anim-test-btn" data-anim="sleep">SONNO</button>
+      <button class="anim-test-btn" data-anim="click_annoyed">CLICK</button>
+      <button class="anim-test-btn" data-anim="victory_hop">VITTORIA</button>
     </div>
 
     <!-- Timer Monolith -->

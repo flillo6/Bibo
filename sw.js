@@ -8,7 +8,7 @@
  * - Native iOS & Android PWA live revalidation
  */
 
-const CACHE_NAME = 'bibo-pwa-v5.3';
+const CACHE_NAME = 'bibo-pwa-v5.4';
 
 const STATIC_ASSETS = [
   './',
