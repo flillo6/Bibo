@@ -9,7 +9,7 @@ export const DICTIONARY = {
   it: {
     // App Meta & Header
     'app.name': 'BIBO',
-    'app.status.online': '[●] {count} ONLINE IN SILENZIO',
+    'app.status.online': '{count} ONLINE IN SILENZIO',
     'app.btn.profile': '[ PROFILO ]',
     'app.btn.pantry': '[ DISPENSA ({count} OGGETTI) ]',
     'app.btn.pantry_short': '[ DISPENSA ]',
@@ -198,7 +198,7 @@ export const DICTIONARY = {
   en: {
     // App Meta & Header
     'app.name': 'BIBO',
-    'app.status.online': '[●] {count} STUDYING IN SILENCE',
+    'app.status.online': '{count} STUDYING IN SILENCE',
     'app.btn.profile': '[ PROFILE ]',
     'app.btn.pantry': '[ PANTRY ({count} ITEMS) ]',
     'app.btn.pantry_short': '[ PANTRY ]',

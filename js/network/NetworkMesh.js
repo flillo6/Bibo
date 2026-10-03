@@ -38,9 +38,15 @@ export class NetworkMesh {
     this.isInitialized = true;
 
     try {
-      // Dynamic import of Trystero Nostr/Torrent serverless WebRTC connector
-      // Using unpkg/esm.sh CDN with local fallback
-      const trysteroModule = await import('https://esm.sh/trystero@0.20.7/nostr').catch(() => null);
+      // Dynamic import of Trystero Torrent WebRTC connector with Nostr fallback
+      let trysteroModule = null;
+      try {
+        trysteroModule = await import('https://esm.sh/trystero/torrent');
+      } catch (_) {
+        try {
+          trysteroModule = await import('https://esm.sh/trystero/nostr');
+        } catch (_) {}
+      }
 
       if (trysteroModule && trysteroModule.joinRoom) {
         const config = { appId: 'bibo-16bit-global-study' };

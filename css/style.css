@@ -778,107 +778,138 @@ body {
 
   /* Stage & Canvas on mobile */
   .main-stage {
-    padding: 2px 0;
+    padding: 4px 0;
     flex: 1 1 auto;
     min-height: 0;
-    justify-content: center;
-    gap: 2px;
+    justify-content: space-evenly;
+    gap: 4px;
     overflow: hidden;
   }
 
   .pet-container {
-    margin-bottom: -4px;
+    margin-bottom: -2px;
   }
 
   #biboCanvas {
-    width: min(210px, 52vw);
-    height: min(210px, 52vw);
-    max-height: 28vh;
+    width: min(230px, 58vw);
+    height: min(230px, 58vw);
+    max-height: 32vh;
   }
 
   .speech-bubble {
     font-size: 9.5px;
-    padding: 5px 10px;
-    max-width: min(290px, 86vw);
-    top: -18px;
+    padding: 6px 12px;
+    max-width: min(300px, 86vw);
+    top: -20px;
   }
 
   .timer-display {
-    font-size: 26px;
-    padding: 2px 8px;
+    font-size: 28px;
+    padding: 2px 10px;
     letter-spacing: 2px;
   }
 
   .timer-actions {
-    gap: 6px;
-    margin-top: 4px;
+    gap: 8px;
+    margin-top: 6px;
   }
 
   .action-btn, .preset-btn {
-    padding: 6px 12px;
+    padding: 6px 14px;
     font-size: 10px;
     min-height: 32px;
   }
 
-  /* Bottom HUD on mobile - Guaranteed strictly visible within viewport */
+  /* Bottom HUD on mobile - Ergonomic Two-Tiered Retro Control Bar */
   .bottom-hud {
-    height: 46px;
-    min-height: 46px;
-    padding: 4px 8px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 4px;
+    height: auto;
+    min-height: 76px;
+    padding: 6px 16px max(14px, env(safe-area-inset-bottom, 14px));
+    display: grid;
+    grid-template-areas:
+      "needs needs"
+      "audio pantry";
+    grid-template-columns: 1fr 1fr;
+    row-gap: 8px;
+    column-gap: 12px;
     width: 100%;
+    max-width: 360px;
+    margin: 0 auto;
     flex-shrink: 0;
     box-sizing: border-box;
-  }
-
-  .bottom-hud .hud-left {
-    flex: 0 0 auto;
-  }
-
-  .audio-chip {
-    font-size: 8.5px;
-    padding: 4px 6px;
-    max-width: 88px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    align-items: center;
   }
 
   .needs-grid {
-    flex: 0 1 auto;
+    grid-area: needs;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1px 6px;
-    max-width: 130px;
+    gap: 4px 16px;
+    width: 100%;
+    max-width: 100%;
     margin: 0 auto;
     justify-items: center;
   }
 
   .need-row {
-    font-size: 7.5px;
-    gap: 3px;
+    font-size: 8.5px;
+    gap: 5px;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    justify-content: space-between;
+    max-width: 135px;
   }
 
   .need-track {
-    width: 28px;
-    height: 6px;
+    width: 54px;
+    height: 7px;
+  }
+
+  .bottom-hud .hud-left {
+    grid-area: audio;
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+    position: relative;
+  }
+
+  .audio-chip {
+    font-size: 9px;
+    padding: 6px 8px;
+    width: 100%;
+    max-width: 155px;
+    min-height: 32px;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #audioPopover {
+    bottom: 40px !important;
+    left: 0 !important;
+    min-width: 200px;
   }
 
   .bottom-hud .hud-right {
-    flex: 0 0 auto;
+    grid-area: pantry;
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    position: relative;
   }
 
   .pantry-chip {
-    font-size: 8.5px;
-    padding: 4px 6px;
+    font-size: 9px;
+    padding: 6px 8px;
+    width: 100%;
+    max-width: 155px;
+    min-height: 32px;
+    text-align: center;
     white-space: nowrap;
-    max-width: 105px;
     overflow: hidden;
     text-overflow: ellipsis;
-    flex-shrink: 0;
   }
 
   /* Modals & Docks on mobile */
