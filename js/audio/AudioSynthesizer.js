@@ -30,12 +30,14 @@ class AudioSynthesizer {
 
   /**
    * Set ambient background noise: 'mute', 'rain', or 'brown'
-   * Synchronous audio node startup to preserve mobile gesture activation.
+   * Handles user gesture unlocking and suspended state transitions on iOS/Android PWA
    */
-  setAmbient(type) {
+  async setAmbient(type) {
     this._initContext();
     if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume().catch(() => {});
+      try {
+        await this.ctx.resume();
+      } catch (_) {}
     }
 
     this.stopAmbient();
@@ -92,7 +94,7 @@ class AudioSynthesizer {
     filter.frequency.value = 800;
 
     this.ambientGain = this.ctx.createGain();
-    this.ambientGain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+    this.ambientGain.gain.setValueAtTime(0.20, this.ctx.currentTime);
 
     whiteNoise.connect(filter);
     filter.connect(this.ambientGain);
@@ -159,7 +161,7 @@ class AudioSynthesizer {
     filter.frequency.value = 850;
 
     this.ambientGain = this.ctx.createGain();
-    this.ambientGain.gain.setValueAtTime(0.38, this.ctx.currentTime);
+    this.ambientGain.gain.setValueAtTime(0.46, this.ctx.currentTime);
 
     rainSource.connect(filter);
     filter.connect(this.ambientGain);
@@ -184,7 +186,7 @@ class AudioSynthesizer {
     osc.frequency.setValueAtTime(180, t);
     osc.frequency.exponentialRampToValueAtTime(55, t + 0.03);
 
-    gain.gain.setValueAtTime(0.08, t);
+    gain.gain.setValueAtTime(0.11, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
 
     osc.connect(gain);
@@ -218,7 +220,7 @@ class AudioSynthesizer {
     filter.Q.value = 3.5;
 
     const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.07, t);
+    gain.gain.setValueAtTime(0.10, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.015);
 
     noise.connect(filter);
@@ -244,7 +246,7 @@ class AudioSynthesizer {
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(freq, t + (idx * 0.03));
 
-      gain.gain.setValueAtTime(0.1, t + (idx * 0.03));
+      gain.gain.setValueAtTime(0.13, t + (idx * 0.03));
       gain.gain.exponentialRampToValueAtTime(0.001, t + (idx * 0.03) + 0.075);
 
       osc.connect(gain);
@@ -278,7 +280,7 @@ class AudioSynthesizer {
     filter.frequency.value = 2500;
 
     const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.09, t);
+    gain.gain.setValueAtTime(0.12, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
 
     noise.connect(filter);

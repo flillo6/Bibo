@@ -166,6 +166,10 @@ class BiboApp {
       this.isDocumentVisible = true;
       this.anim.isPlaying = true;
       this.anim.lastFrameTime = 0; // Trigger next frame immediately without waiting or freezing
+      // Resume audio context if ambient noise is actively playing
+      if (audioSynth.ctx && audioSynth.ctx.state === 'suspended' && audioSynth.currentAmbient !== 'mute') {
+        audioSynth.ctx.resume().catch(() => {});
+      }
       // Instantly recalculate natural biological decay for time spent away
       if (this.pet && typeof this.pet.refreshOfflineDecay === 'function') {
         this.pet.refreshOfflineDecay();
