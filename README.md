@@ -2,140 +2,175 @@
 > **A zero-cost (€0 OpEx), community-driven Web App study companion featuring a 16-bit retro living pet.**
 > One synchronized global companion for all students worldwide.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](#)
+[![License: Proprietary](https://img.shields.io/badge/License-All%20Rights%20Reserved-red.svg)](#)
 [![OpEx: 0€](https://img.shields.io/badge/OpEx-0€%2Fmo-success.svg)](#)
 [![Tests: 13 Passed](https://img.shields.io/badge/Tests-13%20Passed-brightgreen.svg)](#)
 [![CI/CD: GitHub Actions](https://github.com/flillo6/bibo/actions/workflows/deploy.yml/badge.svg)](https://github.com/flillo6/bibo/actions)
+[![PWA: Offline Ready](https://img.shields.io/badge/PWA-Offline%20Ready-blue.svg)](#)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-orange.svg)](https://flillo6.github.io/bibo/)
 
 ---
 
 ## 📖 Sommario & Visione
 
-**BIBO** è un compagno di studio digitale in pixel art (un simpatico pet con testa a monitor CRT azzurro, corpo in feltro blu, guantoni bianchi stile cartoon e sneakers vintage) progettato secondo il paradigma del **Passive Body Doubling** e della **Calm Computing**:
-- Nessuna distrazione: Bibo sta seduto o in piedi sul tavolo accanto a te mentre studi su libri fisici o appunti.
-- Nessuna notifica ansiogena o percentuale minacciosa: solo micro-barre a blocchi e suoni fisici piacevoli.
-- **Unico nel suo genere**: non esiste un Bibo per ogni utente, bensì **un solo Bibo sincronizzato per l'intero pianeta**. Quando un milione di ore di studio complessivo vengono accumulate dalla comunità globale, Bibo si evolve per tutti.
+**BIBO** è un compagno di studio digitale in pixel art (un simpatico automa con testa a monitor CRT azzurro, corpo in feltro blu, guantoni bianchi stile cartoon e sneakers vintage) progettato secondo i paradigmi di **Calm Computing** e **Passive Body Doubling**:
+
+* **Zero Distrazioni:** Bibo sta seduto o in piedi sul tavolo accanto a te mentre studi su libri fisici o quaderni. Nessuna gamification tossica, niente notifiche ansiogene o pop-up pubblicitari.
+* **Unico per l'Intero Pianeta:** Non esiste una copia isolata per ogni utente; esiste **un solo Bibo sincronizzato per l'intero pianeta**. Ogni minuto di studio reale e ogni cura (biscotto, caffè, spugnetta) donata da qualsiasi studente nel mondo contribuisce all'EXP collettiva per risvegliare le ere successive.
+* **Zero Costi Operativi (€0 OpEx):** L'intero ecosistema è architettato per non costare un singolo centesimo al mese di infrastruttura server, database cloud o API proprietarie a gettone.
 
 ---
 
-## 🏛️ Architettura di Sistema (C4 Model)
+## 🏛️ Architettura di Sistema (C4 Container Model)
 
 ```mermaid
 graph TD
-    subgraph Client ["Client Browser (Sovereign Local-First)"]
-        UI["UI Layer (Dieter Rams Minimalist, 100vh)"]
-        CanvasEngine["Canvas 2D Engine (15 FPS Locked)"]
-        AudioSynth["Procedural Web Audio (Brown Noise / Rain / Clicks)"]
-        PetSM["Pet State Machine (Hunger / Energy / Cleanliness / EXP)"]
-        Storage["Local Storage (3-Word Secret Recovery Key)"]
-        Mesh["NetworkMesh (WebRTC DataChannels + Nostr Relays)"]
+    subgraph Client ["Client Browser (Sovereign Local-First & PWA)"]
+        UI["UI Layer (Dieter Rams Minimalist, 100dvh Responsive)"]
+        SW["Service Worker (Cache-First / Stale-While-Revalidate)"]
+        CanvasEngine["Canvas 2D Engine (15 FPS Discrete Loop)"]
+        AudioSynth["Procedural Web Audio (Brown Noise / Rain / Relays)"]
+        PetSM["Pet State Machine (Hunger / Energy / Clean / EXP)"]
+        KnowledgeEngine["Knowledge Engine (Byzantine 67% BFT Consensus)"]
+        Storage["Profile Storage (3-Word Sovereign Paper Key)"]
+        Mesh["NetworkMesh (P2P WebRTC DataChannels + Nostr)"]
     end
 
-    subgraph ZeroCostInfra ["Zero-Cost Infrastructure (€0 OpEx)"]
-        GH_Pages["GitHub Pages CDN (Static Assets, WASM, Atlas)"]
-        GH_Actions["GitHub Actions (Hourly Git-as-a-Backend Sync)"]
-        NostrRelay["Public Ephemeral Nostr Relays (NIP-16 Discovery)"]
+    subgraph ZeroCostInfra ["Zero-Cost Decentralized Infrastructure (€0 OpEx)"]
+        GH_Pages["GitHub Pages CDN (Immutable Static Assets & Atlas)"]
+        NostrRelay["Public Nostr Relays (NIP-16 Ephemeral Matchmaking)"]
+        P2PPeers["Browser-to-Browser WebRTC Swarm (CRDT Sync)"]
     end
 
     UI --> CanvasEngine
     UI --> AudioSynth
     UI --> PetSM
+    UI --> KnowledgeEngine
     PetSM --> Storage
-    PetSM --> Mesh
+    PetSM <--> Mesh
     Mesh <--> NostrRelay
-    GH_Pages --> Client
-    GH_Actions -.-> GH_Pages
+    Mesh <--> P2PPeers
+    SW --> GH_Pages
 ```
 
 ---
 
-## ⚡ FinOps Blueprint: Come Funziona a 0€ / Mese
+## ⚡ FinOps Blueprint: Come Funziona a 0€ / Mese per Sempre
 
 | Componente Tradizionale | Soluzione Cloud Standard | Costo Mensile Standard | Soluzione BIBO (Zero-Cost) | Costo BIBO |
 | :--- | :--- | :--- | :--- | :--- |
 | **Hosting & CDN** | AWS S3 + CloudFront / Vercel Pro | ~20€ - 50€ | GitHub Pages + Cloudflare Free Tier | **0,00 €** |
-| **Database Utenti** | Supabase / PostgreSQL | ~25€ - 100€ | Local-First Web Storage + 3-Word Seed | **0,00 €** |
-| **Sync Stato Globale** | Redis cluster + WebSocket Server | ~40€ - 150€ | WebRTC P2P DataChannels + Nostr Relays (NIP-16) | **0,00 €** |
-| **Effetti Sonori** | Asset audio MP3/WAV scaricati (CDN) | Banda rete elevata | Sintetizzatore procedurale puro Web Audio (0 Byte) | **0,00 €** |
-| **AI Quiz Engine** | OpenAI API / Gemini API | ~100€ - 500€ | P2P Peer-Review + Algoritmo BFT 67% | **0,00 €** |
-| **TOTALE** | | **~185€ - 800€ / mese** | **Nessun Server, Nessun Token** | **0,00 €** |
+| **Database Utenti** | Supabase / AWS DynamoDB | ~25€ - 100€ | Local-First Storage + 3-Word Mnemonic Seed | **0,00 €** |
+| **Multiplayer Sync** | Redis cluster + WebSocket Server | ~40€ - 150€ | WebRTC P2P Mesh + BroadcastChannel + Nostr NIP-16 | **0,00 €** |
+| **Effetti Sonori & Audio** | File audio MP3/WAV scaricati (CDN) | Banda elevata | Sintetizzatore procedurale Web Audio API (0 Byte) | **0,00 €** |
+| **AI Quiz & Knowledge** | OpenAI API / Gemini API | ~100€ - 500€ | Byzantine Fault Tolerance (BFT 67%) Peer Review | **0,00 €** |
+| **TOTALE** | | **~185€ - 800€ / mese** | **Nessun Server, Nessun Costo Ricorrente** | **0,00 €** |
 
 ---
 
-## 🎯 Algoritmo di Consenso: Byzantine Fault Tolerance (BFT 67%)
+## 🎯 Algoritmo di Consenso: Byzantine Fault Tolerance (BFT 67%) & Ponte Bilingue
 
-Nel sistema dei micro-quiz e della dispensa, i contenuti non sono gestiti da intelligenze artificiali a pagamento, ma dalla comunità degli studenti tramite consenso distribuito:
-1. Uno studente che studia una materia (es. *Diritto Privato*) formula una domanda con 4 risposte e la invia alla rete.
-2. La domanda entra nella coda di **Peer-Review** di altri studenti della stessa materia.
-3. Per essere convalidata ed entrare nel database permanente, la domanda deve raggiungere il **67% (2/3) di approvazione BFT**.
-4. Gli studenti hanno a disposizione il pulsante `[ ? Non lo so / Salta ]` per prevenire votazioni casuali che inquinerebbero il consenso.
-5. In caso di abusi o risposte errate, 3 segnalazioni concorrenti `[ ⚠️ Segnala ]` revocano immediatamente la domanda.
+Nel sistema dei micro-quiz e dell'enciclopedia di Bibo, le conoscenze non sono delegate ad API esterne a pagamento o allucinazioni di LLM, ma sono convalidate e tradotte dalla comunità studentesca tramite consenso matematico distribuito:
+
+1. **Donazione Nozione:** Uno studente che studia una materia (es. *Chimica Generale*) inserisce una domanda con risposta sintetica dal proprio quaderno (`lang: 'it'`).
+2. **Coda di Peer-Review:** La nozione entra nella coda di verifica di studenti della stessa lingua.
+3. **Consenso Byzantine 67% (2/3):** Per essere convalidata nel pool permanente, la domanda deve raggiungere almeno il **67% di voti favorevoli** su un quorum minimo di 5 revisioni. Il pulsante `[ ? Non lo so / Salta ]` azzera il bias statistico.
+4. **Ponte di Traduzione Cross-Lingual (Approccio 3):** Quando un concetto viene convalidato in una lingua, il sistema genera un'opportunità di traduzione per gli studenti dell'altra lingua. Tradurre un concetto conferisce una ricompensa speciale di **+20 EXP globale**, rendendo Bibo progressivamente bilingue (IT $\leftrightarrow$ EN) in modo del tutto organico.
+5. **Anti-Troll & Flagging:** Tre segnalazioni concorrenti revocano immediatamente qualsiasi domanda tossica o errata.
+
+---
+
+## 📱 Mobile PWA & Calm Design System
+
+* **Dieter Rams Rationalism:** Geometrie nette da 1px, palette *Warm Paper* e *Dark Slate*, caratteri monospazio ad alta leggibilità, finestre a pannello trascinabili su desktop e ancorate a cassetto su smartphone.
+* **100dvh Responsive Layout:** Ottimizzato per azzerare qualsiasi *Cumulative Layout Shift* (CLS) e funzionare sia su monitor 4K che su schermi compatti da 320px (iPhone SE) senza barre di scorrimento indesiderate.
+* **Service Worker PWA:** Installabile su iOS (Safari) e Android (Chrome) come Progressive Web App nativa con caching automatico degli asset a 15 FPS.
+
+---
+
+## 🧪 Automated Test Suite (100% Passing)
+
+BIBO include una suite di unit test eseguibile con il test runner nativo di Node.js (zero dipendenze esterne):
+
+```powershell
+# Esegui tutti i test
+npm test
+```
+
+### Copertura dei Test (13 test / 13 superati):
+* `PetManager.test.js`: Valida la macchina a stati biologica, il decadimento naturale per ora, l'incremento di EXP per biscotto/caffè/spugna e il blocco delle azioni durante il sonno.
+* `StudyTimer.test.js`: Valida i limiti temporali e l'algoritmo **anti-abuso** che accredita esclusivamente i minuti di studio reale e verificato.
+* `KnowledgeEngine.test.js`: Valida matematicamente la **soglia di consenso BFT 67%** e il ponte di traduzione bilingue.
+* `ProfileStorage.test.js`: Valida la derivazione deterministica della frase mnemonica di ripristino a 3 parole e il recupero del profilo senza server.
 
 ---
 
 ## 📁 Struttura della Codebase
 
 ```
-c:\Users\franc\Desktop\_progettini_\Bibo/
-├── index.html                   # Shell applicativa semantica e modali Dieter Rams
-├── package.json                 # Configurazione ES Modules Node.js
-├── DOCS_ANIMATIONS.md           # Specifica tecnica animazioni, sprite e prompt Gemini
-├── README.md                    # Documentazione e C4 Architecture
-├── css/
-│   └── style.css                # Stile minimalista, palette Warm Paper & Dark Slate
+bibo/
+├── .github/
+│   └── workflows/
+│       └── deploy.yml           # CI/CD: esecuzione test e deploy GitHub Pages
 ├── assets/
-│   └── sprites/
-│       ├── baby/                # Sprite Baby Bibo (idle_base.png, atlas.json)
-│       ├── mid/                 # Sprite Mid Bibo
-│       └── adult/               # Sprite Adult Bibo
-└── js/
-    ├── app.js                   # Coordinatore principale e Page Visibility API
-    ├── config.js                # Costanti globali, decadimento biologico e temi
-    ├── i18n.js                  # Motore multilingua (Italiano / Inglese)
-    ├── audio/
-    │   └── AudioSynthesizer.js  # Sintetizzatore Web Audio procedurale (0 byte audio)
-    ├── engine/
-    │   ├── SpriteAnimation.js   # Player 15 FPS con fallback automatico e ombre
-    │   ├── PetManager.js        # Macchina a stati biologica (Fame, Sonno, Pulizia)
-    │   └── StudyTimer.js        # Timer di studio verificato anti-abuso
-    ├── knowledge/
-    │   ├── KnowledgeEngine.js   # Motore quiz distribuito con Peer-Review BFT 67%
-    │   └── StarterPack.js       # Schede di partenza (Chimica, Diritto, Medicina, ecc.)
-    └── storage/
-        └── ProfileStorage.js    # Storage locale con recovery key a 3 parole
+│   ├── icons/                   # Icone PWA (192x192, 512x512)
+│   └── sprites/baby/            # Fogli sprite e frame dell'automa Baby Bibo
+├── css/
+│   └── style.css                # Sistema Dieter Rams, temi e media queries 100dvh
+├── js/
+│   ├── app.js                   # Coordinatore principale e Page Visibility API
+│   ├── config.js                # Parametri biologici, progressione e costanti
+│   ├── i18n.js                  # Motore bilingue reattivo (Italiano / Inglese)
+│   ├── audio/
+│   │   └── AudioSynthesizer.js  # Sintetizzatore Web Audio procedurale (0 Byte CDN)
+│   ├── engine/
+│   │   ├── SpriteAnimation.js   # Player Canvas 2D a 15 FPS discrete
+│   │   ├── PetManager.js        # Macchina a stati biologica e dispensa
+│   │   └── StudyTimer.js        # Timer Pomodoro anti-abuso
+│   ├── knowledge/
+│   │   ├── KnowledgeEngine.js   # Motore quiz distribuito con BFT 67% e traduzioni
+│   │   └── StarterPack.js       # Schede bilingue di partenza
+│   ├── network/
+│   │   └── NetworkMesh.js       # Sincronizzazione P2P WebRTC / Nostr a 0€
+│   └── storage/
+│       └── ProfileStorage.js    # Identità sovrana con chiave mnemonica a 3 parole
+├── tests/
+│   ├── setup.js                 # Shim headless per Node.js
+│   ├── runAll.js                # Master test runner
+│   ├── PetManager.test.js
+│   ├── StudyTimer.test.js
+│   ├── KnowledgeEngine.test.js
+│   └── ProfileStorage.test.js
+├── index.html                   # Entry point semantico
+├── manifest.json                # Configurazione Web App PWA
+├── package.json                 # Modulo ES e script di test
+├── sw.js                        # Service Worker (Cache-First offline)
+└── README.md                    # Documentazione tecnica e STAR guide
 ```
-
----
-
-## 🚀 Avvio Rapido Locale
-
-Non sono necessarie installazioni complesse o dipendenze pesanti. È sufficiente un qualsiasi web server HTTP locale:
-
-```powershell
-# Opzione 1: Con Python (già presente sul sistema)
-python -m http.server 8000
-
-# Opzione 2: Con Node.js npx
-npx serve .
-```
-
-Apri il browser su `http://localhost:8000`.
 
 ---
 
 ## 💼 STAR Interview Guide (CV & Colloqui da Tech Lead)
 
-Se desideri presentare questo progetto nel tuo portfolio, CV o durante colloqui tecnici:
+Se presenti questo progetto nel tuo portfolio, CV o durante colloqui tecnici:
 
-- **S (Situation)**: Gli studenti universitari soffrono di isolamento durante le sessioni di studio profondo e tendono a distrarsi con app di produttività sovraccariche di notifiche e gamification tossica. I progetti concorrenti richiedono server cloud costosi per la sincronizzazione multiplayer.
-- **T (Task)**: Progettare un assistente di studio minimalista ispirato al Tamagotchi e alla Calm Computing con architettura a costo operativo zero (€0 OpEx), in grado di sincronizzare milioni di studenti senza server centralizzati e con consumo di risorse CPU/GPU prossimo allo zero.
-- **A (Action)**:
-  - Realizzato un motore Canvas 2D bloccato a 15 FPS abbinato alla **Page Visibility API** per azzerare l'uso della CPU quando la scheda è minimizzata.
-  - Sviluppato un **Audio Synthesizer procedurale** tramite la Web Audio API (rumore Brown filtrato, pioggia bicanale, click fisici meccanici) eliminando completamente il download di file audio via CDN.
-  - Architettato un protocollo di validazione delle conoscenze basato su **Byzantine Fault Tolerance (soglia 67%)** e un'architettura **Local-First** con chiavi di ripristino mnemonico a 3 parole (Sovereign Storage).
-  - Implementato un sistema di sprite modulare a prova di guasto (graceful fallback chain) per le animazioni.
-- **R (Result)**:
-  - Zero costi di gestione per sempre (€0 server, €0 database, €0 API esterne).
-  - Tempo di avvio inferiore a 200ms e footprint di memoria < 30MB.
-  - Esperienza utente fluida, rispettosa della vista e dei cicli di attenzione dello studente.
+* **S (Situation):** Gli studenti universitari soffrono di isolamento durante le sessioni di studio profondo e tendono a distrarsi con app di produttività sovraccariche di notifiche e gamification tossica. I servizi multiplayer tradizionali richiedono server cloud costosi (WebSocket, Redis, DB) che rendono i progetti indipendenti insostenibili (€200-800/mese).
+* **T (Task):** Architettare un assistente di studio minimalista ispirato al Tamagotchi e alla Calm Computing con architettura a costo operativo zero (€0 OpEx), in grado di sincronizzare studenti a livello globale senza server centralizzati e con footprint CPU/GPU prossimo allo zero.
+* **A (Action):**
+  * Realizzato un motore Canvas 2D bloccato a 15 FPS discrete integrato con la **Page Visibility API** per azzerare l'uso della CPU quando la scheda è in background.
+  * Sviluppato un **Audio Synthesizer procedurale** tramite la Web Audio API (rumore Brown filtrato, pioggia bicanale, click fisici meccanici) eliminando completamente il download di file audio via CDN.
+  * Architettato un protocollo di validazione delle conoscenze basato su **Byzantine Fault Tolerance (soglia 67%)** e un ponte di traduzione decentralizzato.
+  * Implementato un sistema di identità sovrana locale (**Local-First**) con chiavi di ripristino mnemonico a 3 parole (Sovereign Storage).
+  * Connesso un mesh di rete decentralizzato **P2P WebRTC (Trystero / Nostr)** con riconciliazione dati CRDT a costo zero.
+  * Configurato Service Worker PWA per l'esecuzione offline su dispositivi mobili (iOS Safari e Android).
+* **R (Result):**
+  * **0,00 € di costi per sempre** (nessun server, nessun database a pagamento, nessuna API a gettone).
+  * Tempo di avvio inferiore a 50ms (da cache PWA) e footprint di memoria < 30MB.
+  * 13 test automatizzati passati su 13 con CI/CD GitHub Actions e deployment automatico.
+
+---
+
+## 📄 Proprietà Intellettuale & Licenza
+
+© 2026 **flillo6**. Tutti i diritti riservati.
+Il codice e il concept visivo di BIBO sono di proprietà intellettuale esclusiva dell'autore per scopi di portfolio e dimostrazione tecnica.
