@@ -154,7 +154,7 @@ class BiboApp {
     } else {
       this.isDocumentVisible = true;
       this.anim.isPlaying = true;
-      this.anim.lastFrameTime = performance.now();
+      this.anim.lastFrameTime = 0; // Trigger next frame immediately without waiting or freezing
       // Instantly recalculate natural biological decay for time spent away
       if (this.pet && typeof this.pet.refreshOfflineDecay === 'function') {
         this.pet.refreshOfflineDecay();
@@ -1081,7 +1081,13 @@ class BiboApp {
             this.pet.fallAsleep();
           } else {
             this.pet.state = 'AWAKE';
-            this.pet._playTemporaryAnimation(animKey, 3000);
+            const durationMs = Math.round((12 / CONFIG.FRAME_RATE) * 1000); // 3000ms at 4 FPS
+            this.pet._playTemporaryAnimation(animKey, durationMs + 200);
+            setTimeout(() => {
+              animBtns.forEach(b => b.classList.remove('active'));
+              const idleBtn = document.querySelector('.anim-test-btn[data-anim="idle_base"]');
+              if (idleBtn) idleBtn.classList.add('active');
+            }, durationMs);
           }
         });
       });

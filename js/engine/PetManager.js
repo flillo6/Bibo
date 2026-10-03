@@ -70,6 +70,7 @@ export class PetManager {
 
     // Biological States: 'AWAKE' | 'ASLEEP'
     this.activeEvolution = 'baby';
+    this.isTestEvoLocked = false;
 
     // Persist vitals immediately
     this._saveVitals();
@@ -122,21 +123,24 @@ export class PetManager {
     this.globalExp += amountExp;
     localStorage.setItem('bibo_user_contributed_exp', this.userContributedExp);
 
-    // Dynamic Evolution Progression
-    let nextEvo = 'baby';
-    if (this.globalExp >= CONFIG.GLOBAL_PROGRESSION.TARGET_EXP_ERA_3) {
-      nextEvo = 'adult';
-    } else if (this.globalExp >= CONFIG.GLOBAL_PROGRESSION.TARGET_EXP_ERA_2) {
-      nextEvo = 'mid';
-    }
-
-    if (nextEvo !== this.activeEvolution) {
-      this.activeEvolution = nextEvo;
-      if (this.anim) {
-        this.anim.setEvolution(nextEvo);
+    // Dynamic Evolution Progression (respected unless user is manually testing evo)
+    let nextEvo = this.activeEvolution;
+    if (!this.isTestEvoLocked) {
+      nextEvo = 'baby';
+      if (this.globalExp >= CONFIG.GLOBAL_PROGRESSION.TARGET_EXP_ERA_3) {
+        nextEvo = 'adult';
+      } else if (this.globalExp >= CONFIG.GLOBAL_PROGRESSION.TARGET_EXP_ERA_2) {
+        nextEvo = 'mid';
       }
-      if (this.onEvolution) {
-        this.onEvolution(nextEvo);
+
+      if (nextEvo !== this.activeEvolution) {
+        this.activeEvolution = nextEvo;
+        if (this.anim) {
+          this.anim.setEvolution(nextEvo);
+        }
+        if (this.onEvolution) {
+          this.onEvolution(nextEvo);
+        }
       }
     }
 
@@ -364,6 +368,7 @@ export class PetManager {
    */
   setEvolutionStage(evoKey) {
     if (['baby', 'mid', 'adult'].includes(evoKey)) {
+      this.isTestEvoLocked = true;
       this.activeEvolution = evoKey;
       if (this.anim) {
         this.anim.setEvolution(evoKey);
@@ -515,10 +520,11 @@ export class PetManager {
       });
     }
 
-    // Safety fallback timer if backgrounded
+    // Safety fallback timer if backgrounded (ensure it never truncates the 3000ms 12-frame playback)
+    const timeoutMs = Math.max(durationMs, 3500);
     this.reactionTimeout = setTimeout(() => {
       this._updateAnimationState();
-    }, durationMs);
+    }, timeoutMs);
     if (typeof this.reactionTimeout.unref === 'function') {
       this.reactionTimeout.unref();
     }

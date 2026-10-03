@@ -51,6 +51,16 @@ export class SpriteAnimationPlayer {
       scale: 1.0
     });
 
+    // Mark as ready immediately so Bibo renders and animates with zero freeze
+    this.isLoaded = true;
+    this.lastFrameTime = 0;
+
+    // Render frame 0 immediately to eliminate any blank canvas flicker
+    const baseEntry = this.cache.get('baby:idle_base');
+    if (baseEntry) {
+      this._renderFrame(baseEntry.img, baseEntry.meta, 0);
+    }
+
     // 2. Pre-register all canonical animations across all 3 evolutions (baby, mid, adult)
     const allEvos = ['baby', 'mid', 'adult'];
     const allAnims = Object.values(CONFIG.ANIMATIONS);
@@ -70,9 +80,10 @@ export class SpriteAnimationPlayer {
         // Scale and vertical offsets tailored to each evolution's frame proportions
         const scale = isBaby ? 1.0 : 0.90;
         const yOffset = isBaby ? (isSleep ? 30 : 0) : (isSleep ? -5 : -10);
-        const groundY = isBaby ? (isSleep ? 437 : 452) : (isSleep ? 495 : 490);
-        const shadowScaleX = isSleep ? 0.44 : (isBaby ? 0.33 : 0.38);
-        const shadowScaleY = isSleep ? 12 : (isBaby ? 9 : 11);
+        // Ground Y: Mid & Adult feet touch higher up (470 instead of 490) so shadow hugs sneakers
+        const groundY = isBaby ? (isSleep ? 437 : 452) : (isSleep ? 475 : 470);
+        const shadowScaleX = isSleep ? 0.44 : (isBaby ? 0.33 : 0.36);
+        const shadowScaleY = isSleep ? 12 : (isBaby ? 9 : 10);
 
         loadPromises.push(
           this.loadSprite(evo, anim, `assets/sprites/${evo}/${anim}.png`, {
@@ -93,9 +104,10 @@ export class SpriteAnimationPlayer {
       }
     }
 
-    await Promise.all(loadPromises);
-    this.isLoaded = true;
-    console.log('[SpriteAnimation] Animation pipeline initialized with all canonical animations loaded.');
+    // Stream remaining sprites in the background with Promise.allSettled
+    Promise.allSettled(loadPromises).then(() => {
+      console.log('[SpriteAnimation] All background sprite sheets loaded.');
+    });
   }
 
   /**
@@ -134,7 +146,7 @@ export class SpriteAnimationPlayer {
         }
         resolve(false);
       };
-      img.src = `${imgUrl}?v=5.5`;
+      img.src = `${imgUrl}?v=6.1`;
     });
   }
 
@@ -145,7 +157,30 @@ export class SpriteAnimationPlayer {
     if (this.currentEvo !== evoKey) {
       this.currentEvo = evoKey;
       this.currentFrame = 0;
+      this.lastFrameTime = 0;
+      // Immediately render active animation for new evolution if loaded
+      const entry = this.getSpriteEntry(this.currentEvo, this.currentAnim);
+      if (entry) {
+        this._renderFrame(entry.img, entry.meta, 0);
+      }
     }
+  }
+
+  /**
+   * Helper to retrieve sprite entry with hierarchical fallback
+   */
+  getSpriteEntry(evo, anim) {
+    let entry = this.cache.get(`${evo}:${anim}`);
+    if (!entry) {
+      entry = this.cache.get(`${evo}:${CONFIG.ANIMATIONS.IDLE_BASE}`);
+    }
+    if (!entry) {
+      entry = this.cache.get(`baby:${anim}`);
+    }
+    if (!entry) {
+      entry = this.cache.get(`baby:${CONFIG.ANIMATIONS.IDLE_BASE}`);
+    }
+    return entry;
   }
 
   /**
@@ -159,28 +194,27 @@ export class SpriteAnimationPlayer {
     this.isLooping = loop;
     this.onComplete = onComplete;
     this.isPlaying = true;
+    this.lastFrameTime = 0; // Trigger next frame immediately!
   }
 
   /**
-   * Main render tick locked at CONFIG.FRAME_RATE (8 FPS)
+   * Main render tick locked at CONFIG.FRAME_RATE (4 FPS)
    */
   tick(timestamp) {
     if (!this.isPlaying || !this.isLoaded) return;
 
-    if (timestamp - this.lastFrameTime >= this.frameInterval) {
-      this.lastFrameTime = timestamp;
+    const now = (typeof timestamp === 'number' && timestamp > 0) ? timestamp : performance.now();
+
+    // Guard against clock jumps or negative delta when un-pausing/tab switching
+    if (this.lastFrameTime > now) {
+      this.lastFrameTime = 0;
+    }
+
+    if (now - this.lastFrameTime >= this.frameInterval) {
+      this.lastFrameTime = now;
 
       // Resolve active sprite or fallback chain:
-      let entry = this.cache.get(`${this.currentEvo}:${this.currentAnim}`);
-      if (!entry) {
-        entry = this.cache.get(`${this.currentEvo}:${CONFIG.ANIMATIONS.IDLE_BASE}`);
-      }
-      if (!entry) {
-        entry = this.cache.get(`baby:${this.currentAnim}`);
-      }
-      if (!entry) {
-        entry = this.cache.get(`baby:${CONFIG.ANIMATIONS.IDLE_BASE}`);
-      }
+      const entry = this.getSpriteEntry(this.currentEvo, this.currentAnim);
 
       if (entry) {
         const { img, meta } = entry;
@@ -238,12 +272,12 @@ export class SpriteAnimationPlayer {
     const sneakerGroundY = dy + (targetHeight * (groundY / fh));
 
     // 1. Crisp grounding ellipse shadow placed precisely under Bibo (firmly on canvas floor)
-    const isSleep = (meta.groundY === 437 || meta.groundY === 495);
+    const isSleep = (meta.groundY === 437 || meta.groundY === 475);
     const shadowX = width / 2;
-    const isBaby = (meta.groundY === 452 || meta.groundY === 437);
-    // User requirement: For Evo 2 (mid) and Evo 3 (adult), shadow slightly higher than before (+8px under contact)
-    const evoOffsetY = isSleep ? 0 : (isBaby ? 3 : 8);
-    const shadowY = Math.min(height - 10, sneakerGroundY + evoOffsetY);
+    const isBaby = (this.currentEvo === 'baby');
+    // For Evo 2 (mid) and Evo 3 (adult), shadow slightly higher up (towards feet: -6px)
+    const evoOffsetY = isSleep ? 0 : (isBaby ? 3 : -6);
+    const shadowY = Math.min(height - 12, sneakerGroundY + evoOffsetY);
     const shadowRadiusX = targetWidth * (meta.shadowScaleX || 0.33);
     const shadowRadiusY = meta.shadowScaleY || 9;
 

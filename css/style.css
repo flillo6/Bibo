@@ -88,6 +88,11 @@ input[type=number] {
   appearance: textfield;
 }
 
+html {
+  background-color: var(--bg-primary);
+  height: 100%;
+}
+
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
@@ -467,8 +472,11 @@ body {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  border-top: none;
-  background-color: transparent;
+  border: none !important;
+  border-top: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
   z-index: 10;
 }
 
@@ -867,8 +875,11 @@ body {
     flex-shrink: 0;
     box-sizing: border-box;
     align-items: center;
-    border-top: none;
-    background-color: transparent;
+    border: none !important;
+    border-top: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
   }
 
   .needs-grid {

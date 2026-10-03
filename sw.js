@@ -8,18 +8,18 @@
  * - Native iOS & Android PWA live revalidation
  */
 
-const CACHE_NAME = 'bibo-pwa-v6.0';
+const CACHE_NAME = 'bibo-pwa-v6.1';
 
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './css/style.css?v=6.0',
+  './css/style.css?v=6.1',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
   './js/config.js',
   './js/i18n.js',
-  './js/app.js?v=6.0',
+  './js/app.js?v=6.1',
   './js/audio/AudioSynthesizer.js',
   './js/engine/SpriteAnimation.js',
   './js/engine/PetManager.js',
@@ -114,9 +114,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Static assets: Stale-While-Revalidate
+  // 2. Static assets: Stale-While-Revalidate (with ignoreSearch to reliably hit pre-cached sprite assets)
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
+    caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
       const fetchPromise = fetch(event.request)
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
