@@ -110,6 +110,17 @@ class BiboApp {
       console.log(`[NetworkMesh] Synchronized community notion for topic "${notion.topic}" from peer [${sourceId}]`);
     };
 
+    this.mesh.onVoteSync = (voteData, sourceId) => {
+      if (!voteData || !voteData.notionId) return;
+      this.knowledge.registerPeerVote(
+        voteData.notionId,
+        voteData.voterKey || sourceId,
+        voteData.vote,
+        voteData.studyMinutes || 0
+      );
+      console.log(`[NetworkMesh] Synchronized peer vote for notion "${voteData.notionId}" from peer [${sourceId}]`);
+    };
+
     this.mesh.onPeerCountChange = () => {
       this._updateOnlineCount();
     };
@@ -535,7 +546,17 @@ class BiboApp {
   _handleReviewVote(vote) {
     audioSynth.playRelayClick();
     if (this.currentReviewCandidate) {
-      this.knowledge.voteCandidate(this.currentReviewCandidate.id, vote);
+      const studyMins = Math.floor((this.profile.lifetimeSeconds || 0) / 60);
+      const voterKey = this.profile.secretKey || (this.mesh ? this.mesh.localPeerId : 'local');
+      this.knowledge.voteCandidate(this.currentReviewCandidate.id, vote, voterKey, studyMins);
+      if (this.mesh) {
+        this.mesh.broadcastVote({
+          notionId: this.currentReviewCandidate.id,
+          voterKey,
+          vote,
+          studyMinutes: studyMins
+        });
+      }
       profileStorage.recordReview();
       const expGain = CONFIG.GLOBAL_PROGRESSION ? CONFIG.GLOBAL_PROGRESSION.EXP_REVIEW_VOTE : 5;
       this.pet.gainExp(expGain, 'review');

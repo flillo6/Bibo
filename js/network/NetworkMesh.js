@@ -23,6 +23,7 @@ export class NetworkMesh {
     this.onPeerCountChange = null;
     this.onTopicsSync = null;
     this.onNotionSync = null;
+    this.onVoteSync = null;
     this.getCustomTopics = null;
 
     this.roomTorrent = null;
@@ -262,6 +263,9 @@ export class NetworkMesh {
       case 'BIBO_P2P_NOTION':
         if (this.onNotionSync) this.onNotionSync(packet.payload, actualSender);
         break;
+      case 'VOTE_BROADCAST':
+        if (this.onVoteSync) this.onVoteSync(packet.payload, actualSender);
+        break;
     }
 
     if (packet.ttl && packet.ttl > 1) {
@@ -279,6 +283,8 @@ export class NetworkMesh {
       this._mergeCRDTState(data.payload || data, peerId);
     } else if (data.type === 'BIBO_P2P_NOTION' || data.type === 'NOTION_BROADCAST') {
       if (this.onNotionSync) this.onNotionSync(data.payload || data, peerId);
+    } else if (data.type === 'VOTE_BROADCAST') {
+      if (this.onVoteSync) this.onVoteSync(data.payload || data, peerId);
     } else {
       this._handleGossipPacket(data, peerId);
     }
@@ -311,6 +317,10 @@ export class NetworkMesh {
 
   broadcastNotion(notion) {
     this._emitGossip('NOTION_BROADCAST', notion);
+  }
+
+  broadcastVote(voteData) {
+    this._emitGossip('VOTE_BROADCAST', voteData);
   }
 
   _mergeCRDTState(payload, sourceId) {

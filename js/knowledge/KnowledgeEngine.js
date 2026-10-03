@@ -69,6 +69,9 @@ export class KnowledgeEngine {
 
     // Reported / Flagged questions list for review
     this.flaggedReports = [];
+
+    // Byzantine Weighted Peer Vote Registry: notionId -> Map(voterKey -> { vote, weight })
+    this.voterRegistry = new Map();
   }
 
   /**
@@ -290,10 +293,64 @@ export class KnowledgeEngine {
   }
 
   /**
-   * Cast a vote on a candidate: 'true' | 'false' | 'skip'
-   * Implements Byzantine 67% qualification rule.
+   * Computes deterministic SHA-256 Notion ID from canonical content
    */
-  voteCandidate(candidateId, vote) {
+  async computeNotionId(canonicalTopic, question, answer) {
+    const content = `${canonicalTopic}|${question.trim().toLowerCase()}|${answer.trim().toLowerCase()}`;
+    if (typeof crypto !== 'undefined' && crypto.subtle) {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(content));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    let hash = 0;
+    for (let i = 0; i < content.length; i++) {
+      hash = ((hash << 5) - hash) + content.charCodeAt(i);
+      hash |= 0;
+    }
+    return 'notion_' + Math.abs(hash).toString(16);
+  }
+
+  /**
+   * Verifies Proof-of-Work anti-spam solution
+   */
+  async verifyProofOfWork(notionId, nonce, difficultyBits = 14) {
+    const targetPrefix = '0'.repeat(Math.floor(difficultyBits / 4));
+    const raw = `${notionId}:${nonce}`;
+    if (typeof crypto !== 'undefined' && crypto.subtle) {
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+      const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+      return hex.startsWith(targetPrefix);
+    }
+    return true;
+  }
+
+  /**
+   * Solves Proof-of-Work anti-spam puzzle client-side (1-2s computation)
+   */
+  async solveProofOfWork(notionId, difficultyBits = 14) {
+    const targetPrefix = '0'.repeat(Math.floor(difficultyBits / 4));
+    let nonce = 0;
+    const encoder = new TextEncoder();
+    while (true) {
+      const raw = `${notionId}:${nonce}`;
+      if (typeof crypto !== 'undefined' && crypto.subtle) {
+        const digest = await crypto.subtle.digest('SHA-256', encoder.encode(raw));
+        const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+        if (hex.startsWith(targetPrefix)) {
+          return nonce;
+        }
+      } else {
+        return nonce;
+      }
+      nonce++;
+      if (nonce > 100000) return nonce; // Safety guard
+    }
+  }
+
+  /**
+   * Cast a vote on a candidate: 'true' | 'false' | 'skip'
+   * Implements Byzantine 67% qualification rule with optional peer weighting.
+   */
+  voteCandidate(candidateId, vote, voterKey = 'local_user', studyMinutes = 0) {
     const cand = this.candidateQueue.find(c => c.id === candidateId);
     if (!cand) return;
 
@@ -304,6 +361,9 @@ export class KnowledgeEngine {
     } else if (vote === 'false') {
       cand.votesFalse++;
     }
+
+    // Register into Byzantine weighted registry
+    this.registerPeerVote(candidateId, voterKey, vote, studyMinutes);
 
     const totalVotes = cand.votesTrue + cand.votesFalse;
     if (totalVotes >= 5) {
@@ -320,6 +380,44 @@ export class KnowledgeEngine {
       }
     } else {
       this._saveCandidateQueue();
+    }
+  }
+
+  /**
+   * Registers a peer vote weighted by verified study time (Proof-of-Study weight)
+   */
+  registerPeerVote(notionId, voterKey, vote, studyMinutes = 0) {
+    const cand = this.candidateQueue.find(c => c.id === notionId);
+    if (!cand) return;
+
+    if (!this.voterRegistry) this.voterRegistry = new Map();
+    if (!this.voterRegistry.has(notionId)) {
+      this.voterRegistry.set(notionId, new Map());
+    }
+    const votesMap = this.voterRegistry.get(notionId);
+
+    // 1 weight per 15 minutes of verified study, bounded [1, 100]
+    const weight = Math.max(1, Math.min(100, Math.floor((studyMinutes || 0) / 15)));
+    votesMap.set(voterKey, { vote, weight });
+
+    let totalWeightTrue = 0;
+    let totalWeightFalse = 0;
+
+    for (const entry of votesMap.values()) {
+      if (entry.vote === 'true') totalWeightTrue += entry.weight;
+      if (entry.vote === 'false') totalWeightFalse += entry.weight;
+    }
+
+    const totalWeight = totalWeightTrue + totalWeightFalse;
+
+    if (totalWeight >= 15) {
+      const ratio = totalWeightTrue / totalWeight;
+      if (ratio >= 0.67) {
+        this._promoteCandidate(cand);
+      } else if (totalWeightFalse / totalWeight >= 0.34) {
+        this.candidateQueue = this.candidateQueue.filter(c => c.id !== notionId);
+        this._saveCandidateQueue();
+      }
     }
   }
 

@@ -89,3 +89,29 @@ test('NetworkMesh - Collective Memory: Stale offline peer cannot overwrite newer
   assert.ok(pet.hunger > 80, 'Stale offline peer must not overwrite fresh state');
 });
 
+test('NetworkMesh - Synchronizes peer review votes across GossipSub overlay', () => {
+  const pet = new PetManager();
+  const mesh = new NetworkMesh(pet);
+
+  let receivedVote = null;
+  mesh.onVoteSync = (data) => {
+    receivedVote = data;
+  };
+
+  mesh._handleIncomingMessage({
+    type: 'VOTE_BROADCAST',
+    payload: {
+      notionId: 'cand_test_99',
+      voterKey: 'peer_verona_01',
+      vote: 'true',
+      studyMinutes: 45
+    }
+  }, 'peer_verona_01');
+
+  assert.ok(receivedVote !== null, 'onVoteSync should receive remote peer vote');
+  assert.equal(receivedVote.notionId, 'cand_test_99');
+  assert.equal(receivedVote.vote, 'true');
+  assert.equal(receivedVote.studyMinutes, 45);
+});
+
+
