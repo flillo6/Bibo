@@ -248,6 +248,11 @@ class BiboApp {
     setText('pantryTitle', i18n.t('pantry.title'));
     setText('pantrySub', i18n.t('pantry.sub'));
     setText('pantryCloseBtn', i18n.t('app.btn.close'));
+    setText('pantryInfoBtn', i18n.t('pantry.btn.info'));
+    setText('pantryInfoHeading', i18n.t('pantry.info.heading'));
+    setText('pantryInfoP1', i18n.t('pantry.info.p1'));
+    setText('pantryInfoP2', i18n.t('pantry.info.p2'));
+    setText('pantryInfoP3', i18n.t('pantry.info.p3'));
     const availStr = (i18n.currentLocale || i18n.locale) === 'en' ? 'Available:' : 'Disponibili:';
     setText('lblQtyBiscuitPrefix', availStr);
     setText('lblQtyCoffeePrefix', availStr);
@@ -825,6 +830,15 @@ class BiboApp {
       audioSynth.playClick();
       this._closeModal('pantryModal');
     });
+    const pantryInfoBtn = document.getElementById('pantryInfoBtn');
+    const pantryInfoCard = document.getElementById('pantryInfoCard');
+    if (pantryInfoBtn && pantryInfoCard) {
+      pantryInfoBtn.addEventListener('click', () => {
+        audioSynth.playClick();
+        const isHidden = pantryInfoCard.style.display === 'none' || !pantryInfoCard.style.display;
+        pantryInfoCard.style.display = isHidden ? 'flex' : 'none';
+      });
+    }
     document.getElementById('feedBiscuitBtn').addEventListener('click', () => this._handleFeedBiscuit());
     document.getElementById('offerCoffeeBtn').addEventListener('click', () => this._handleOfferCoffee());
     document.getElementById('cleanSpongeBtn').addEventListener('click', () => this._handleCleanSponge());

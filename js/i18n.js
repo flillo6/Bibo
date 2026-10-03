@@ -107,6 +107,11 @@ export const DICTIONARY = {
     'pantry.sponge.desc': 'Rimuove la polvere e pulisce il monitor (+30%)',
     'pantry.sponge.btn': '[ PULISCI BIBO ]',
     'pantry.close': '[ CHIUDI DISPENSA ]',
+    'pantry.btn.info': '[ ? INFO ]',
+    'pantry.info.heading': 'COME FUNZIONA LA DISPENSA:',
+    'pantry.info.p1': '• Produzione Risorse: Ogni sessione di studio reale della community produce automaticamente biscotti, caffè e spugnette per il fondo comune.',
+    'pantry.info.p2': '• Cura Condivisa: Chiunque nel mondo può usare le scorte per nutrire Bibo, ricaricarlo o pulire il monitor CRT.',
+    'pantry.info.p3': '• Sincronizzazione CRDT: Le risorse sono matematicamente sincronizzate via mesh P2P (PN-Counter) a zero conflitti.',
     
     // Pantry Warning Messages (Biological State Machine)
     'pantry.warn.sleeping_feed': 'Bibo sta dormendo profondamente... offrigli prima una tazza di caffè per svegliarlo!',
@@ -296,6 +301,11 @@ export const DICTIONARY = {
     'pantry.sponge.desc': 'Cleans monitor dust (+30%)',
     'pantry.sponge.btn': '[ CLEAN BIBO ]',
     'pantry.close': '[ CLOSE PANTRY ]',
+    'pantry.btn.info': '[ ? INFO ]',
+    'pantry.info.heading': 'HOW THE PANTRY WORKS:',
+    'pantry.info.p1': '• Resource Production: Every real study session from the community generates biscuits, coffee, and sponges for the shared pool.',
+    'pantry.info.p2': '• Shared Care: Anyone in the world can use these supplies to feed Bibo, restore his energy, or clean his CRT monitor.',
+    'pantry.info.p3': '• CRDT Convergence: Stock is mathematically synchronized via a zero-conflict P2P mesh (PN-Counter).',
     
     // Pantry Warnings
     'pantry.warn.sleeping_feed': 'Bibo is sleeping deeply... offer him a coffee first to wake him up!',

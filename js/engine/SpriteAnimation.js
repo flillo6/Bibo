@@ -275,11 +275,11 @@ export class SpriteAnimationPlayer {
     const isSleep = (meta.groundY === 437 || meta.groundY === 475);
     const shadowX = width / 2;
     const isBaby = (this.currentEvo === 'baby');
-    // For Evo 2 (mid) and Evo 3 (adult), shadow slightly higher up (towards feet: -6px)
-    const evoOffsetY = isSleep ? 0 : (isBaby ? 3 : -6);
-    const shadowY = Math.min(height - 12, sneakerGroundY + evoOffsetY);
+    // Scale shadow offset proportionally to targetHeight so mobile and desktop render with 100% identical geometry
+    const evoOffsetY = isSleep ? 0 : (isBaby ? (targetHeight * 0.008) : -(targetHeight * 0.016));
+    const shadowY = sneakerGroundY + evoOffsetY;
     const shadowRadiusX = targetWidth * (meta.shadowScaleX || 0.33);
-    const shadowRadiusY = meta.shadowScaleY || 9;
+    const shadowRadiusY = (meta.shadowScaleY || 9) * (scale / 1.08);
 
     // 1. Draw sprite frame first
     this.ctx.drawImage(img, sx, sy, fw, fh, dx, dy, targetWidth, targetHeight);
