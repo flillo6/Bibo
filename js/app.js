@@ -631,18 +631,26 @@ class BiboApp {
       } else if (this.timer.state === 'PAUSED') {
         this._showSpeechBubble(i18n.t('bubble.paused'));
       } else {
-        // Idle state: trigger annoyed/poke reaction so Bibo visibly reacts when touched
-        const text = this.pet.onUserClickedDuringStudy();
-        if (text) {
-          this._showSpeechBubble(text);
+        // Idle state: if needs are low, communicate via speech bubble!
+        if (this.pet.hunger <= CONFIG.NEEDS.HUNGER.criticalThreshold) {
+          this._showSpeechBubble(i18n.t('bubble.needs.hungry'));
+        } else if (this.pet.energy <= 35) {
+          this._showSpeechBubble(i18n.t('bubble.needs.tired'));
+        } else if (this.pet.cleanliness <= CONFIG.NEEDS.CLEANLINESS.criticalThreshold) {
+          this._showSpeechBubble(i18n.t('bubble.needs.dirty'));
         } else {
-          const idleGreetings = [
-            i18n.t('bubble.idle.1'),
-            i18n.t('bubble.idle.2'),
-            i18n.t('bubble.idle.3')
-          ];
-          const pick = idleGreetings[Math.floor(Math.random() * idleGreetings.length)];
-          this._showSpeechBubble(pick);
+          const text = this.pet.onUserClickedDuringStudy();
+          if (text) {
+            this._showSpeechBubble(text);
+          } else {
+            const idleGreetings = [
+              i18n.t('bubble.idle.1'),
+              i18n.t('bubble.idle.2'),
+              i18n.t('bubble.idle.3')
+            ];
+            const pick = idleGreetings[Math.floor(Math.random() * idleGreetings.length)];
+            this._showSpeechBubble(pick);
+          }
         }
       }
     });

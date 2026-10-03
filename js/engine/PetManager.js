@@ -431,18 +431,13 @@ export class PetManager {
 
   /**
    * Determines active idle animation based on biological hierarchy
+   * (Stanco, affamato e sporco usano IDLE_BASE per semplicità visiva, comunicando via fumetto)
    */
   _updateAnimationState() {
     let animKey = CONFIG.ANIMATIONS.IDLE_BASE;
 
     if (this.state === 'ASLEEP') {
       animKey = CONFIG.ANIMATIONS.SLEEP;
-    } else if (this.hunger <= CONFIG.NEEDS.HUNGER.criticalThreshold) {
-      animKey = CONFIG.ANIMATIONS.IDLE_AFFAMATO;
-    } else if (this.energy <= 35) { // Tired posture (yawning, requests coffee)
-      animKey = CONFIG.ANIMATIONS.IDLE_STANCO;
-    } else if (this.cleanliness <= CONFIG.NEEDS.CLEANLINESS.criticalThreshold) {
-      animKey = CONFIG.ANIMATIONS.IDLE_SPORCO;
     }
 
     if (this.anim) {
