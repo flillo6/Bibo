@@ -1,0 +1,10 @@
+{
+  "name": "bibo",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Bibo - The 16-Bit Global Study Companion",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/runAll.js"
+  }
+}

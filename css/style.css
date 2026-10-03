@@ -1,0 +1,919 @@
+/**
+ * BIBO - Rationalist Minimalist Design System
+ * 
+ * Inspired by Dieter Rams (Braun) & Panic Playdate:
+ * - Crisp 1px geometry, zero fuzzy drop shadows
+ * - Monospaced typographic grid
+ * - High readability, zero Cumulative Layout Shift (CLS)
+ * - 15 FPS discrete feel
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+
+/* Color Variables */
+:root {
+  /* Warm Paper (Default) */
+  --bg-primary: #F5F0E8;
+  --bg-surface: #EBE4D8;
+  --bg-card: #FAF6EF;
+  --border-color: #2E3440;
+  --text-primary: #2E3440;
+  --text-secondary: #766B5E;
+  --accent-crt: #C97A3E;
+  --accent-clean: #5E81AC;
+  --accent-green: #4C7A5D;
+  --accent-red: #A34E4E;
+  --modal-backdrop: rgba(46, 52, 64, 0.45);
+
+  /* Room Environment Planes */
+  --floor-color: #E8E0D2;
+  --room-glow: rgba(255, 255, 255, 0.45);
+
+  /* Distinct Personal Stat Colors */
+  --stat-hunger: #D46A43; /* Warm Terracotta / Toast */
+  --stat-energy: #4E9B66; /* Mint Battery Vitality */
+  --stat-clean: #4A86A8;  /* Fresh Water Blue */
+  --stat-exp: #D49B35;    /* Amber Cathode Gold */
+  
+  --font-mono: 'Space Mono', 'Departure Mono', monospace, -apple-system;
+}
+
+[data-theme="dark_slate"] {
+  --bg-primary: #12151A;
+  --bg-surface: #1A2028;
+  --bg-card: #202732;
+  --border-color: #4C566A;
+  --text-primary: #ECEFF4;
+  --text-secondary: #8892B0;
+  --accent-crt: #E5A95A;
+  --accent-clean: #88C0D0;
+  --accent-green: #8FBCBB;
+  --accent-red: #BF616A;
+  --modal-backdrop: rgba(10, 12, 16, 0.75);
+
+  /* Room Environment Planes */
+  --floor-color: #0E1116;
+  --room-glow: rgba(229, 169, 90, 0.05);
+
+  /* Distinct Personal Stat Colors */
+  --stat-hunger: #E06C75; /* Warm Coral */
+  --stat-energy: #98C379; /* Electric Green */
+  --stat-clean: #56B6C2;  /* Cyan Water */
+  --stat-exp: #E5C07B;    /* CRT Amber Gold */
+}
+
+/* Reset */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Remove browser number spinner arrows */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Top Navigation HUD - Seamless Room Header */
+.top-hud {
+  height: 52px;
+  padding: 12px 24px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  border-bottom: none;
+  background-color: transparent;
+  z-index: 10;
+}
+
+.hud-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  justify-self: start;
+}
+
+.status-dot {
+  color: var(--accent-green);
+}
+
+.hud-center {
+  position: relative;
+  justify-self: center;
+  text-align: center;
+}
+
+.hud-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  justify-self: end;
+}
+
+.topic-chip {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+}
+
+.topic-chip:hover {
+  background-color: var(--bg-card);
+}
+
+/* Topic Dropdown Popover */
+.topic-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 280px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  padding: 8px;
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  z-index: 50;
+}
+
+.topic-popover.active {
+  display: flex;
+}
+
+.topic-search-input {
+  width: 100%;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 6px 8px;
+  outline: none;
+}
+
+.topic-suggestions {
+  max-height: 160px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.topic-item {
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.topic-item:hover {
+  background-color: var(--bg-primary);
+  color: var(--accent-crt);
+}
+
+/* Main Viewport Stage - Pure Seamless Space */
+.main-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+  background-color: var(--bg-primary);
+}
+
+/* Bibo Interactive Container */
+.pet-container {
+  position: relative;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: -8px;
+}
+
+#biboCanvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  width: 380px;
+  height: 380px;
+}
+
+/* Speech Bubble (Needs & Interactive Reaction) */
+.speech-bubble {
+  position: absolute;
+  top: -26px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: normal;
+  max-width: min(340px, 86vw);
+  text-align: center;
+  line-height: 1.35;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.15);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: opacity 0.15s steps(2), transform 0.15s steps(2);
+  z-index: 20;
+}
+
+.speech-bubble.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.speech-bubble.sleeping {
+  top: 72px;
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 6px 6px 0;
+  border-style: solid;
+  border-color: var(--border-color) transparent;
+}
+
+/* Timer Monolith */
+.timer-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.timer-display {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  cursor: pointer;
+  padding: 2px 14px;
+  border: 1px solid transparent;
+  transition: border-color 0.1s;
+}
+
+.timer-display:hover {
+  border-color: var(--border-color);
+  background-color: var(--bg-surface);
+}
+
+.timer-display.locked {
+  cursor: default;
+}
+
+.timer-display.locked:hover {
+  border-color: transparent;
+  background-color: transparent;
+}
+
+/* Duration Popover */
+.duration-popover {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  padding: 8px;
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 30;
+}
+
+.duration-popover.active {
+  display: flex;
+}
+
+.preset-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.preset-btn {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.preset-btn:hover {
+  background-color: var(--accent-crt);
+  color: #FFF;
+}
+
+.custom-mins-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.custom-mins-input {
+  width: 50px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 4px;
+  outline: none;
+}
+
+.timer-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.action-btn {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 7px 16px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+}
+
+.action-btn:hover {
+  background-color: var(--bg-card);
+}
+
+.action-btn:active {
+  transform: translateY(1px);
+}
+
+.action-btn.primary {
+  background-color: var(--border-color);
+  color: var(--bg-primary);
+}
+
+.action-btn.primary:hover {
+  background-color: var(--accent-crt);
+  color: #FFF;
+  border-color: var(--accent-crt);
+}
+
+/* 4 Centered Needs Micro-Bars inside Bottom HUD */
+.needs-grid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 0;
+  width: auto;
+}
+
+.need-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.need-track {
+  width: 64px;
+  height: 10px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-surface);
+  overflow: hidden;
+  position: relative;
+}
+
+.need-fill {
+  height: 100%;
+  transition: width 0.2s steps(8);
+}
+
+.need-fill.hunger {
+  background-color: var(--stat-hunger);
+}
+
+.need-fill.clean {
+  background-color: var(--stat-clean);
+}
+
+.need-fill.energy {
+  background-color: var(--stat-energy);
+}
+
+.need-fill.exp {
+  background-color: var(--stat-exp);
+}
+
+/* Bottom HUD - Seamless Room Footer */
+.bottom-hud {
+  height: 52px;
+  padding: 8px 24px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  border-top: none;
+  background-color: transparent;
+  z-index: 10;
+}
+
+.bottom-hud .hud-left {
+  justify-self: start;
+}
+
+.bottom-hud .hud-right {
+  justify-self: end;
+}
+
+.audio-chip, .pantry-chip, .btn-std {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.audio-chip:hover, .pantry-chip:hover, .btn-std:hover {
+  background-color: var(--bg-card);
+}
+
+/* Floating Dock Card System (Compact Anchored Panels for Pantry & Profile) */
+.floating-dock-card {
+  position: fixed;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16), 2px 2px 0px rgba(0, 0, 0, 0.08);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease, visibility 0.22s;
+  overflow: hidden;
+}
+
+.floating-dock-card.dock-top-right {
+  top: 60px;
+  right: 24px;
+  width: 360px;
+  max-width: calc(100vw - 48px);
+  transform: translateY(-10px) scale(0.98);
+}
+
+.floating-dock-card.dock-bottom-right {
+  bottom: 60px;
+  right: 24px;
+  width: 380px;
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 120px);
+  transform: translateY(10px) scale(0.98);
+}
+
+.floating-dock-card.active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.floating-dock-card .modal-header {
+  padding: 10px 14px;
+}
+
+.floating-dock-card .modal-body {
+  padding: 14px;
+  gap: 12px;
+}
+
+/* Modal System (Pop-ups) */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--modal-backdrop);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal-overlay.active {
+  display: flex;
+}
+
+.modal-card {
+  width: 520px;
+  max-width: 90vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--bg-surface);
+  cursor: grab;
+  user-select: none;
+}
+
+.modal-header:active, .modal-header.dragging {
+  cursor: grabbing;
+}
+
+.modal-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.modal-close-btn:hover {
+  color: var(--accent-red);
+}
+
+.modal-body {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Form Controls & Inputs */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.text-input {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 8px 10px;
+  outline: none;
+}
+
+.text-input:focus {
+  border-color: var(--accent-crt);
+}
+
+/* Pantry Items List */
+.pantry-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-surface);
+  gap: 12px;
+}
+
+.pantry-item-row .action-btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 108px;
+  text-align: center;
+  padding: 8px 10px;
+  font-size: 10px;
+}
+
+.pantry-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.pantry-item-name {
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.pantry-item-qty {
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+/* Quiz Options Grid */
+.quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.quiz-opt-btn {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 10px 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.quiz-opt-btn:hover {
+  background-color: var(--bg-primary);
+  border-color: var(--accent-crt);
+}
+
+.quiz-opt-btn.correct {
+  background-color: var(--accent-green);
+  color: #FFF;
+  border-color: var(--accent-green);
+}
+
+.quiz-opt-btn.wrong {
+  background-color: var(--accent-red);
+  color: #FFF;
+  border-color: var(--accent-red);
+}
+
+/* Feedback / Toast Messages */
+.toast-msg {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  font-size: 11px;
+  font-weight: 700;
+  background-color: var(--bg-surface);
+}
+
+.toast-msg.warn {
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+}
+
+.toast-msg.success {
+  border-color: var(--accent-green);
+  color: var(--accent-green);
+}
+
+/* ==================== MOBILE & TABLET RESPONSIVENESS ==================== */
+
+@media (max-width: 768px) {
+  html, body {
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
+    width: 100vw;
+    overflow: hidden;
+    position: fixed;
+    top: 0;
+    left: 0;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Top HUD on mobile */
+  .top-hud {
+    height: 44px;
+    min-height: 44px;
+    padding: 4px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    box-sizing: border-box;
+  }
+
+  .hud-left {
+    font-size: 8.5px;
+    gap: 4px;
+  }
+
+  .topic-chip {
+    font-size: 9px;
+    padding: 3px 6px;
+    max-width: 115px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .hud-right .btn-std {
+    font-size: 8.5px;
+    padding: 3px 6px;
+  }
+
+  /* Stage & Canvas on mobile */
+  .main-stage {
+    padding: 2px 0;
+    flex: 1 1 auto;
+    min-height: 0;
+    justify-content: center;
+    gap: 2px;
+    overflow: hidden;
+  }
+
+  .pet-container {
+    margin-bottom: -4px;
+  }
+
+  #biboCanvas {
+    width: min(210px, 52vw);
+    height: min(210px, 52vw);
+    max-height: 28vh;
+  }
+
+  .speech-bubble {
+    font-size: 9.5px;
+    padding: 5px 10px;
+    max-width: min(290px, 86vw);
+    top: -18px;
+  }
+
+  .timer-display {
+    font-size: 26px;
+    padding: 2px 8px;
+    letter-spacing: 2px;
+  }
+
+  .timer-actions {
+    gap: 6px;
+    margin-top: 4px;
+  }
+
+  .action-btn, .preset-btn {
+    padding: 6px 12px;
+    font-size: 10px;
+    min-height: 32px;
+  }
+
+  /* Bottom HUD on mobile - Guaranteed strictly visible within viewport */
+  .bottom-hud {
+    height: 46px;
+    min-height: 46px;
+    padding: 4px 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    flex-shrink: 0;
+    box-sizing: border-box;
+  }
+
+  .bottom-hud .hud-left {
+    flex: 0 0 auto;
+  }
+
+  .audio-chip {
+    font-size: 8.5px;
+    padding: 4px 6px;
+    max-width: 88px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .needs-grid {
+    flex: 0 1 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px 6px;
+    max-width: 130px;
+    margin: 0 auto;
+    justify-items: center;
+  }
+
+  .need-row {
+    font-size: 7.5px;
+    gap: 3px;
+  }
+
+  .need-track {
+    width: 28px;
+    height: 6px;
+  }
+
+  .bottom-hud .hud-right {
+    flex: 0 0 auto;
+  }
+
+  .pantry-chip {
+    font-size: 8.5px;
+    padding: 4px 6px;
+    white-space: nowrap;
+    max-width: 105px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+  }
+
+  /* Modals & Docks on mobile */
+  .floating-dock-card {
+    max-width: calc(100vw - 16px) !important;
+    width: calc(100vw - 16px) !important;
+    left: 8px !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    top: auto !important;
+    max-height: calc(100dvh - 56px) !important;
+  }
+
+  .floating-dock-card.dock-top-right {
+    top: 50px !important;
+    bottom: auto !important;
+  }
+
+  .modal-card {
+    max-width: calc(100vw - 16px);
+    max-height: 86vh;
+    max-height: 86dvh;
+    overflow-y: auto;
+  }
+}
+
+/* Extra small height viewports (landscape mobile or compact screens) */
+@media (max-height: 640px) {
+  #biboCanvas {
+    width: min(160px, 44vw);
+    height: min(160px, 44vw);
+    max-height: 24vh;
+  }
+  .timer-display {
+    font-size: 22px;
+  }
+}
+

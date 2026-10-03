@@ -1,0 +1,45 @@
+{
+  "character": "baby_bibo",
+  "frame_width": 512,
+  "frame_height": 512,
+  "frame_count": 12,
+  "fps": 12,
+  "animations": {
+    "idle_base": {
+      "loop": true,
+      "loopStartFrame": 0
+    },
+    "idle_affamato": {
+      "loop": true,
+      "loopStartFrame": 0
+    },
+    "idle_stanco": {
+      "loop": true,
+      "loopStartFrame": 0
+    },
+    "idle_sporco": {
+      "loop": true,
+      "loopStartFrame": 0
+    },
+    "eat_biscuit": {
+      "loop": false,
+      "loopStartFrame": 0
+    },
+    "clean_sponge": {
+      "loop": false,
+      "loopStartFrame": 0
+    },
+    "sleep": {
+      "loop": true,
+      "loopStartFrame": 9
+    },
+    "click_annoyed": {
+      "loop": false,
+      "loopStartFrame": 0
+    },
+    "victory_hop": {
+      "loop": false,
+      "loopStartFrame": 0
+    }
+  }
+}

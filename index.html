@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="warm_paper">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>BIBO — Virtual Study Companion</title>
+
+  <!-- PWA & Mobile Web App Capabilities (iOS & Android) -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="BIBO">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#2e3440">
+
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+  <link rel="icon" type="image/png" href="assets/icons/icon-192.png">
+  <link rel="manifest" href="manifest.json">
+
+  <link rel="stylesheet" href="css/style.css?v=3.1">
+</head>
+<body>
+
+  <!-- TOP NAVIGATION HUD -->
+  <header class="top-hud">
+    <div class="hud-left">
+      <span class="status-dot">●</span>
+      <span id="onlineCountText">[●] 1.482 ONLINE IN SILENZIO</span>
+    </div>
+
+    <div class="hud-center">
+      <button id="topicChipBtn" class="topic-chip" aria-label="Seleziona Materia">
+        <span id="topicChipText">CHIMICA GENERALE</span>
+        <span>▾</span>
+      </button>
+
+      <!-- Topic Dropdown / Autocomplete Popover -->
+      <div id="topicPopover" class="topic-popover">
+        <input type="text" id="topicSearchInput" class="topic-search-input" placeholder="Cerca o inserisci materia..." autocomplete="off">
+        <div id="topicSuggestions" class="topic-suggestions">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <div class="hud-right">
+      <button id="profileBtn" class="btn-std">[ PROFILO ]</button>
+    </div>
+  </header>
+
+  <!-- MAIN VIEWPORT STAGE -->
+  <main class="main-stage">
+    
+    <!-- Bibo Interactive Container -->
+    <div class="pet-container" id="biboContainer">
+      <div id="speechBubble" class="speech-bubble">Ehi! Stai studiando, non toccarmi.</div>
+      <canvas id="biboCanvas" width="380" height="380"></canvas>
+    </div>
+
+    <!-- Timer Monolith -->
+    <div class="timer-container">
+      <div id="timerDisplay" class="timer-display">25:00</div>
+
+      <!-- Duration Selector Popover -->
+      <div id="durationPopover" class="duration-popover">
+        <div class="preset-buttons">
+          <button class="preset-btn" data-mins="25">25m</button>
+          <button class="preset-btn" data-mins="45">45m</button>
+          <button class="preset-btn" data-mins="60">60m</button>
+          <button class="preset-btn" data-mins="90">90m</button>
+        </div>
+        <div class="custom-mins-row">
+          <span id="lblCustomMins" style="font-size:10px;">Minuti a mano:</span>
+          <input type="number" id="customMinsInput" class="custom-mins-input" min="5" max="180" placeholder="min">
+          <button id="customMinsApplyBtn" class="preset-btn">OK</button>
+        </div>
+        <div id="customMinsWarn" style="display:none; color:var(--accent-red); font-size:10px; margin-top:2px;">[ ! ] Durata consentita: tra 5 e 180 min</div>
+      </div>
+
+      <div class="timer-actions">
+        <button id="timerPrimaryBtn" class="action-btn primary">[ ▶ AVVIA ]</button>
+        <button id="timerFinishBtn" class="action-btn" style="display:none;">[ ■ CONCLUDI ]</button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- BOTTOM HUD -->
+  <footer class="bottom-hud">
+    <div class="hud-left">
+      <button id="audioBtn" class="audio-chip">[ AUDIO: MUTO ▾ ]</button>
+      <!-- Audio Dropdown Popover -->
+      <div id="audioPopover" class="duration-popover" style="bottom: 56px; left: 24px;">
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <button class="preset-btn" data-audio="mute">MUTO</button>
+          <button class="preset-btn" data-audio="rain">PIOGGIA LEGGERA</button>
+          <button class="preset-btn" data-audio="brown">RUMORE MARRONE (DEEP FOCUS)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4 Needs Micro-Bars Centered in Bottom HUD -->
+    <div class="needs-grid">
+      <div class="need-row">
+        <span id="lblHunger">FAME</span>
+        <div class="need-track"><div id="fillHunger" class="need-fill hunger" style="width: 80%;"></div></div>
+      </div>
+      <div class="need-row">
+        <span id="lblClean">PULIZIA</span>
+        <div class="need-track"><div id="fillClean" class="need-fill clean" style="width: 90%;"></div></div>
+      </div>
+      <div class="need-row">
+        <span id="lblEnergy">ENERGIA</span>
+        <div class="need-track"><div id="fillEnergy" class="need-fill energy" style="width: 85%;"></div></div>
+      </div>
+      <div class="need-row">
+        <span id="lblExp">EXP</span>
+        <div class="need-track"><div id="fillExp" class="need-fill exp" style="width: 45%;"></div></div>
+      </div>
+    </div>
+
+    <div class="hud-right">
+      <button id="pantryBtn" class="pantry-chip">[ DISPENSA (304 OGGETTI) ]</button>
+    </div>
+  </footer>
+
+  <!-- ==================== MODALS (POP-UPS) ==================== -->
+
+  <!-- 1. ONBOARDING MODAL -->
+  <div id="onboardingModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="modal-title" id="onboardingTitle">Questo è BIBO.</span>
+      </div>
+      <div class="modal-body">
+        <p id="onboardingP1">Non è un'app di produttività qualunque. Bibo è un automa vivente, unico al mondo e condiviso da tutti noi contemporaneamente.</p>
+        <div style="display:flex; flex-direction:column; gap:8px; font-size:10px;">
+          <div><strong id="onboardingF1T">TI FA COMPAGNIA:</strong> <span id="onboardingF1D">Mentre studi sui tuoi libri o quaderni, Bibo vive sullo schermo in silenzio, senza telecamere né algoritmi invasivi.</span></div>
+          <div><strong id="onboardingF2T">LO NUTRITE INSIEME:</strong> <span id="onboardingF2D">Il tempo di studio dell'intera community mondiale genera le risorse per sfamarlo, farlo riposare e farlo crescere.</span></div>
+          <div><strong id="onboardingF3T">LA MENTE COLLETTIVA:</strong> <span id="onboardingF3D">Bibo non usa modelli esterni. Impara direttamente da voi: le nozioni vengono verificate tra studenti, costruendo la prima enciclopedia didattica aperta e decentralizzata.</span></div>
+        </div>
+
+        <div class="form-group" style="margin-top:6px;">
+          <label class="form-label" id="lblOnboardName">Come ti chiami?</label>
+          <input type="text" id="onboardNameInput" class="text-input" placeholder="Il tuo nome o nickname...">
+          <div id="onboardNameWarn" style="display:none; color:var(--accent-red); font-size:10px; margin-top:2px;">[ ! ] Inserisci il tuo nome per iniziare</div>
+        </div>
+
+        <div class="form-group" style="position:relative;">
+          <label class="form-label" id="lblOnboardTopic">Cosa prepari o leggi oggi?</label>
+          <input type="text" id="onboardTopicInput" class="text-input" placeholder="Cerca o scrivi liberamente la tua materia..." autocomplete="off">
+          <div id="onboardTopicWarn" style="display:none; color:var(--accent-red); font-size:10px; margin-top:2px;">[ ! ] Inserisci o seleziona cosa stai studiando</div>
+          <div id="onboardTopicSuggestions" class="topic-suggestions" style="position:absolute; top:calc(100% + 2px); left:0; right:0; background:var(--bg-surface); border:1px solid var(--border-color); display:none; z-index:30; max-height:120px; overflow-y:auto;"></div>
+        </div>
+
+        <button id="onboardStartBtn" class="action-btn primary" style="margin-top:6px;">[ INIZIA LA SESSIONE ▶ ]</button>
+        <div style="text-align:center;">
+          <a href="#" id="linkRecoverKey" style="color:var(--text-secondary); text-decoration:none; font-size:10px;">Hai già un profilo? Recupera con la tua chiave segreta</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. FINISH SESSION MODAL (3 STEPS) -->
+  <div id="finishModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title" id="finishHeaderTitle">SESSIONE COMPLETATA (25:00)</div>
+          <div style="font-size:10px; color:var(--text-secondary);" id="finishHeaderSub">Prenditi un minuto per fissare i concetti.</div>
+        </div>
+        <button id="finishCloseBtn" class="modal-close-btn">[ ✕ CHIUDI ]</button>
+      </div>
+
+      <div class="modal-body">
+        
+        <!-- STEP 1: QUIZ -->
+        <div id="finishStep1" class="finish-step">
+          <div style="font-weight:700;" id="quizTitle">Passo 1 di 3: Mettiti alla prova</div>
+          <div style="font-size:10px; color:var(--text-secondary);" id="quizSub">Un concetto verificato dalla community.</div>
+          
+          <div id="quizContentBox" style="margin-top:10px;">
+            <div id="quizQuestionText" style="padding:10px; background:var(--bg-primary); border:1px solid var(--border-color); font-weight:700;">
+              Caricamento quiz...
+            </div>
+            <div id="quizOptionsList" class="quiz-options">
+              <!-- Rendered by JS -->
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+              <button id="quizSkipBtn" class="preset-btn">[ Salta quiz ]</button>
+              <button id="quizFlagBtn" class="preset-btn" style="color:var(--accent-red);">[ ! SEGNALA DOMANDA ]</button>
+            </div>
+          </div>
+
+          <div id="quizEmptyBox" style="display:none; margin-top:10px;">
+            <div style="padding:12px; border:1px solid var(--border-color); background:var(--bg-primary);">
+              <div style="font-weight:700;" id="quizEmptyTitle">[ Nessun quiz disponibile per questa materia ]</div>
+              <div style="font-size:10px; color:var(--text-secondary); margin-top:4px;" id="quizEmptyDesc">Nessuno ha ancora creato nozioni per questa materia. Sii il pioniere: donane una tu al Passo 3!</div>
+            </div>
+            <button id="quizSkipTopicBtn" class="action-btn primary" style="margin-top:10px; width:100%;">[ PASSA ALLA REVISIONE ▶ ]</button>
+          </div>
+        </div>
+
+        <!-- STEP 2: PEER REVIEW -->
+        <div id="finishStep2" class="finish-step" style="display:none;">
+          <div style="font-weight:700;" id="reviewTitle">Passo 2 di 3: Aiuta la Community</div>
+          <div style="font-size:10px; color:var(--text-secondary);" id="reviewSub">Uno studente ha proposto questa nozione. Ti sembra chiara e corretta?</div>
+
+          <div id="reviewCard" style="margin-top:10px; padding:12px; background:var(--bg-primary); border:1px solid var(--border-color); display:flex; flex-direction:column; gap:6px;">
+            <div><span style="color:var(--text-secondary);" id="lblReviewTopic">Materia:</span> <strong id="reviewTopic">Fisica</strong></div>
+            <div><span style="color:var(--text-secondary);" id="lblReviewQ">Domanda:</span> <strong id="reviewQuestion">...</strong></div>
+            <div><span style="color:var(--text-secondary);" id="lblReviewA">Risposta:</span> <span id="reviewAnswer">...</span></div>
+          </div>
+
+          <!-- Standard Voting Buttons -->
+          <div id="reviewVoteActions" style="display:flex; gap:6px; margin-top:12px;">
+            <button id="reviewTrueBtn" class="action-btn" style="flex:1; border-color:var(--accent-green); color:var(--accent-green);">[ ✓ Vero / Corretta ]</button>
+            <button id="reviewFalseBtn" class="action-btn" style="flex:1; border-color:var(--accent-red); color:var(--accent-red);">[ ✗ Falsa / Errata ]</button>
+            <button id="reviewIdkBtn" class="action-btn" style="flex:1;">[ ? Non lo so / Salta ]</button>
+          </div>
+
+          <!-- Translation Bounty Actions (Approccio 3) -->
+          <div id="reviewTranslationActions" style="display:none; flex-direction:column; gap:8px; margin-top:10px;">
+            <input type="text" id="translateQuestionInput" class="text-input" placeholder="Traduci la domanda...">
+            <input type="text" id="translateAnswerInput" class="text-input" placeholder="Traduci la risposta corretta...">
+            <div style="display:flex; gap:6px;">
+              <button id="submitTranslationBtn" class="action-btn primary" style="flex:2;">[ INVIA TRADUZIONE (+20 EXP) ]</button>
+              <button id="skipTranslationBtn" class="action-btn" style="flex:1;">[ Salta ]</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3: DONATE -->
+        <div id="finishStep3" class="finish-step" style="display:none;">
+          <div style="font-weight:700;" id="donateTitle">Passo 3 di 3: Vuoi insegnare qualcosa a Bibo? (Facoltativo)</div>
+          <div style="font-size:10px; color:var(--text-secondary);" id="donateSub">Scrivi una domanda e risposta dal tuo quaderno. Verrà esaminata dalla community.</div>
+
+          <div class="form-group" style="margin-top:10px;">
+            <label class="form-label" id="lblDonateQ">La Domanda:</label>
+            <input type="text" id="donateQuestionInput" class="text-input" placeholder="Scrivi la domanda dal tuo quaderno...">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" id="lblDonateA">La Risposta Corretta:</label>
+            <input type="text" id="donateAnswerInput" class="text-input" placeholder="Scrivi la risposta corretta e sintetica...">
+          </div>
+
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button id="donateSubmitBtn" class="action-btn primary" style="flex:1;">[ INVIA A BIBO ▶ ]</button>
+            <button id="donateCloseBtn" class="action-btn" style="flex:1;">[ Fatto per oggi, chiudi ]</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. PANTRY COMPACT FLOATING DOCK (ANCHORED BOTTOM RIGHT) -->
+  <aside id="pantryModal" class="floating-dock-card dock-bottom-right" aria-label="Dispensa">
+    <div class="modal-header">
+      <span class="modal-title" id="pantryTitle">DISPENSA CONDIVISA</span>
+      <button id="pantryCloseBtn" class="modal-close-btn">[ ✕ CHIUDI ]</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:10px; color:var(--text-secondary);" id="pantrySub">Ogni ora di studio reale della community produce risorse per Bibo.</div>
+      
+      <div id="pantryToast" class="toast-msg" style="display:none;"></div>
+
+      <div class="pantry-item-row">
+        <div class="pantry-item-info">
+          <span class="pantry-item-name" id="pantryItemBiscuitName">BISCOTTO</span>
+          <span class="pantry-item-qty"><span id="lblQtyBiscuitPrefix">Disponibili:</span> <span id="qtyBiscuit">142</span> · <span id="pantryBiscuitDesc">Soddisfa la Fame (+25%)</span></span>
+        </div>
+        <button id="feedBiscuitBtn" class="action-btn primary">[ NUTRI BIBO ]</button>
+      </div>
+
+      <div class="pantry-item-row">
+        <div class="pantry-item-info">
+          <span class="pantry-item-name" id="pantryItemCoffeeName">TAZZA DI CAFFÈ / TÈ</span>
+          <span class="pantry-item-qty"><span id="lblQtyCoffeePrefix">Disponibili:</span> <span id="qtyCoffee">98</span> · <span id="pantryCoffeeDesc">Dà Energia (+25%)</span></span>
+        </div>
+        <button id="offerCoffeeBtn" class="action-btn primary">[ OFFRI CAFFÈ ]</button>
+      </div>
+
+      <div class="pantry-item-row">
+        <div class="pantry-item-info">
+          <span class="pantry-item-name" id="pantryItemSpongeName">SPUGNETTA</span>
+          <span class="pantry-item-qty"><span id="lblQtySpongePrefix">Disponibili:</span> <span id="qtySponge">64</span> · <span id="pantrySpongeDesc">Pulisce il monitor (+30%)</span></span>
+        </div>
+        <button id="cleanSpongeBtn" class="action-btn primary">[ PULISCI BIBO ]</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 4. PROFILE COMPACT FLOATING DOCK (ANCHORED TOP RIGHT) -->
+  <aside id="profileModal" class="floating-dock-card dock-top-right" aria-label="Profilo">
+    <div class="modal-header">
+      <span class="modal-title" id="profileTitle">IDENTITÀ & STATISTICHE</span>
+      <button id="profileCloseBtn" class="modal-close-btn">[ ✕ CHIUDI ]</button>
+    </div>
+    <div class="modal-body">
+      
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:10px;">
+        <div id="profileNameDisplayWrap" style="display:flex; align-items:center; gap:6px;">
+          <span style="color:var(--text-secondary);" id="lblProfileName">NOME:</span> <strong id="profileNameDisplay">Studente</strong>
+        </div>
+        <div id="profileNameEditWrap" style="display:none; align-items:center; gap:4px;">
+          <input type="text" id="profileNameInput" class="text-input" style="width:120px; font-size:11px; padding:3px 6px;">
+          <button id="profileSaveNameBtn" class="preset-btn" style="border-color:var(--accent-green); color:var(--accent-green);">[ OK ]</button>
+          <button id="profileCancelNameBtn" class="preset-btn">[ ✕ ]</button>
+        </div>
+        <button id="profileEditNameBtn" class="preset-btn">[ Modifica ]</button>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:6px; font-size:11px;">
+        <div><span style="color:var(--text-secondary);" id="lblStatLifetime">TEMPO TOTALE:</span> <strong id="statLifetime">0 minuti</strong></div>
+        <div><span style="color:var(--text-secondary);" id="lblStatStreak">SERIE ATTUALE:</span> <strong id="statStreak">1 giorni consecutivi</strong></div>
+        <div><span style="color:var(--text-secondary);" id="lblStatItems">RISORSE PRODOTTE:</span> <strong id="statItems">0 per la dispensa</strong></div>
+        <div><span style="color:var(--text-secondary);" id="lblStatReviews">REVISIONI COMPLETATE:</span> <strong id="statReviews">0 nozioni verificate</strong></div>
+      </div>
+
+      <!-- Secret Key Box -->
+      <div style="border:1px solid var(--border-color); padding:10px; background:var(--bg-primary); display:flex; flex-direction:column; gap:6px; margin-top:6px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <strong style="font-size:10px;" id="lblSecretKey">CHIAVE SEGRETA PERMANENTE</strong>
+          <button id="keyInfoBtn" class="preset-btn" title="Informazioni">[ ? INFO ]</button>
+        </div>
+        <div id="keyInfoText" style="display:none; font-size:10px; color:var(--text-secondary); line-height:1.3;">
+          Questa chiave di 3 parole protegge i tuoi dati senza bisogno di account, email o password. Salvala: se cancelli i dati del browser o cambi computer, ti basterà incollarla per ritrovare all'istante tutte le tue ore.
+        </div>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <input type="text" id="secretKeyDisplay" class="text-input" readonly style="font-weight:700; flex:1;">
+          <button id="copyKeyBtn" class="action-btn">[ COPIA ]</button>
+        </div>
+      </div>
+
+      <!-- Settings: Theme & Language -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+        <div>
+          <span style="color:var(--text-secondary); font-size:10px;" id="lblTheme">TEMA:</span>
+          <button id="toggleThemeBtn" class="preset-btn" style="margin-left:4px;">WARM PAPER</button>
+        </div>
+        <div>
+          <span style="color:var(--text-secondary); font-size:10px;" id="lblLang">LINGUA:</span>
+          <button id="toggleLangBtn" class="preset-btn" style="margin-left:4px;">ITALIANO</button>
+        </div>
+      </div>
+
+      <!-- Animation Live Test Bar -->
+      <div style="border-top:1px solid var(--border-color); padding-top:8px; margin-top:8px;">
+        <div id="lblAnimTestTitle" style="font-size:10px; color:var(--text-secondary); margin-bottom:4px; font-weight:700;">PROVA ANIMAZIONI (tasti 1-9):</div>
+        <div style="display:flex; flex-wrap:wrap; gap:4px;" id="animPreviewButtons">
+          <button class="preset-btn" data-preview-anim="idle_base">1 Base</button>
+          <button class="preset-btn" data-preview-anim="idle_affamato">2 Fame</button>
+          <button class="preset-btn" data-preview-anim="idle_stanco">3 Stanco</button>
+          <button class="preset-btn" data-preview-anim="idle_sporco">4 Sporco</button>
+          <button class="preset-btn" data-preview-anim="eat_biscuit">5 Biscotto</button>
+          <button class="preset-btn" data-preview-anim="clean_sponge">6 Spugna</button>
+          <button class="preset-btn" data-preview-anim="sleep">7 Nanna</button>
+          <button class="preset-btn" data-preview-anim="click_annoyed">8 Tocco</button>
+          <button class="preset-btn" data-preview-anim="victory_hop">9 Vittoria</button>
+        </div>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- 5. RECOVERY MODAL -->
+  <div id="recoveryModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="modal-title" id="recoveryTitle">RECUPERA PROFILO</span>
+        <button id="recoveryCloseBtn" class="modal-close-btn">[ ✕ CHIUDI ]</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:11px;" id="recoveryDesc">Inserisci la tua chiave segreta a 3 parole per ripristinare ore e statistiche:</p>
+        <input type="text" id="recoveryKeyInput" class="text-input" placeholder="es. bibo-luna-caffe">
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button id="recoverySubmitBtn" class="action-btn primary" style="flex:1;">[ RIPRISTINA DATI ]</button>
+          <button id="recoveryCancelBtn" class="action-btn" style="flex:1;">[ ANNULLA ]</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Application Coordinator Entry Point with Cache Buster -->
+  <script type="module" src="js/app.js?v=3.1"></script>
+
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then((reg) => console.log('[PWA] Service Worker registered with scope:', reg.scope))
+          .catch((err) => console.warn('[PWA] Service Worker registration skipped:', err));
+      });
+    }
+  </script>
+</body>
+</html>
