@@ -69,22 +69,24 @@ export class NetworkMesh {
       }
 
       if (trysteroModule && trysteroModule.joinRoom) {
-        const config = usedConnector === 'torrent'
-          ? {
-              appId: 'bibo-16bit-global-study',
-              trackerUrls: [
-                'wss://tracker.openwebtorrent.com',
-                'wss://tracker.webtorrent.dev'
-              ]
-            }
-          : {
-              appId: 'bibo-16bit-global-study',
-              relayUrls: [
-                'wss://relay.damus.io',
-                'wss://nos.lol',
-                'wss://nostr.mom'
-              ]
-            };
+        const config = {
+          appId: 'bibo-16bit-global-study',
+          relayUrls: usedConnector === 'torrent'
+            ? ['wss://tracker.openwebtorrent.com', 'wss://tracker.webtorrent.dev']
+            : ['wss://relay.damus.io', 'wss://nos.lol', 'wss://nostr.mom'],
+          relayConfig: {
+            urls: usedConnector === 'torrent'
+              ? ['wss://tracker.openwebtorrent.com', 'wss://tracker.webtorrent.dev']
+              : ['wss://relay.damus.io', 'wss://nos.lol', 'wss://nostr.mom']
+          },
+          rtcConfig: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:stun1.l.google.com:19302' },
+              { urls: 'stun:stun.cloudflare.com:3478' }
+            ]
+          }
+        };
 
         this.room = trysteroModule.joinRoom(config, this.roomId);
 

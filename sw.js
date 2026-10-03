@@ -8,18 +8,18 @@
  * - Native iOS & Android PWA live revalidation
  */
 
-const CACHE_NAME = 'bibo-pwa-v5.0';
+const CACHE_NAME = 'bibo-pwa-v5.2';
 
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './css/style.css?v=5.0',
+  './css/style.css?v=5.2',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
   './js/config.js',
   './js/i18n.js',
-  './js/app.js?v=5.0',
+  './js/app.js?v=5.2',
   './js/audio/AudioSynthesizer.js',
   './js/engine/SpriteAnimation.js',
   './js/engine/PetManager.js',
@@ -45,7 +45,7 @@ const STATIC_ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[ServiceWorker] Pre-caching offline assets for v5.0...');
+      console.log('[ServiceWorker] Pre-caching offline assets for v5.2...');
       return cache.addAll(STATIC_ASSETS);
     }).then(() => self.skipWaiting())
   );
@@ -58,7 +58,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
-            console.log('[ServiceWorker] Removing legacy cache:', key);
+            console.log('[ServiceWorker] Purging legacy cache:', key);
             return caches.delete(key);
           }
         })
@@ -70,12 +70,9 @@ self.addEventListener('activate', (event) => {
 // Fetch: Network-First for navigation (index.html) so updates arrive instantly,
 // Stale-While-Revalidate for static assets
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
-
-  // Skip chrome-extension and non-http(s) schemes
   if (!url.protocol.startsWith('http')) return;
 
   // 1. Navigation requests: Network-First with Cache Fallback (avoids stale cache on deploy)
@@ -97,7 +94,6 @@ self.addEventListener('fetch', (event) => {
   // 2. Static assets: Stale-While-Revalidate
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      // Return cached asset immediately if found, then update in background
       const fetchPromise = fetch(event.request)
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {

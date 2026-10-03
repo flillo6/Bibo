@@ -105,7 +105,7 @@ class BiboApp {
 
     this.mesh.onNotionSync = (notion, sourceId) => {
       if (!notion || !notion.topic || !notion.question) return;
-      this.knowledge.submitNotion(notion.topic, notion.question, notion.answer, notion.lang || i18n.locale);
+      this.knowledge.addRemoteCandidate(notion);
       profileStorage.addCustomTopic(notion.topic);
       console.log(`[NetworkMesh] Synchronized community notion for topic "${notion.topic}" from peer [${sourceId}]`);
     };

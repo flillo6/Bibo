@@ -17,7 +17,28 @@
   <link rel="icon" type="image/png" href="assets/icons/icon-192.png">
   <link rel="manifest" href="manifest.json">
 
-  <link rel="stylesheet" href="css/style.css?v=5.0">
+  <script>
+    // Sovereign PWA instant upgrade engine (purges legacy v4.0 caches automatically)
+    (function() {
+      const BUILD = 'v5.2';
+      if (localStorage.getItem('bibo_build_version') !== BUILD) {
+        localStorage.setItem('bibo_build_version', BUILD);
+        if ('caches' in window) {
+          caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).then(() => {
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(regs => {
+                Promise.all(regs.map(r => r.unregister())).then(() => {
+                  window.location.reload();
+                });
+              });
+            }
+          });
+        }
+      }
+    })();
+  </script>
+
+  <link rel="stylesheet" href="css/style.css?v=5.2">
 </head>
 <body>
 
@@ -367,25 +388,26 @@
   </div>
 
   <!-- Main Application Coordinator Entry Point with Cache Buster -->
-  <script type="module" src="js/app.js?v=5.0"></script>
+  <script type="module" src="js/app.js?v=5.2"></script>
 
   <!-- PWA Service Worker Registration with Auto-Update & Mobile Standalone Live Refresh -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=5.0')
+        // Register standard sw.js without query strings to allow seamless browser-native updates
+        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
           .then((reg) => {
             // Check for updates on initial page load
-            reg.update();
+            reg.update().catch(() => {});
 
             // Actively check for updates when user brings PWA back to foreground (iOS WebClip / Android)
             document.addEventListener('visibilitychange', () => {
               if (document.visibilityState === 'visible') {
-                reg.update();
+                reg.update().catch(() => {});
               }
             });
-            window.addEventListener('focus', () => reg.update());
-            window.addEventListener('pageshow', () => reg.update());
+            window.addEventListener('focus', () => reg.update().catch(() => {}));
+            window.addEventListener('pageshow', () => reg.update().catch(() => {}));
 
             reg.addEventListener('updatefound', () => {
               const newWorker = reg.installing;

@@ -18,7 +18,8 @@ export class KnowledgeEngine {
     this.verifiedPool = savedPool ? JSON.parse(savedPool) : [...STARTER_PACK];
 
     // Candidate questions queue waiting for peer-review with bilingual content
-    this.candidateQueue = [
+    const savedCandidates = typeof localStorage !== 'undefined' ? localStorage.getItem('bibo_candidate_queue') : null;
+    this.candidateQueue = savedCandidates ? JSON.parse(savedCandidates) : [
       {
         id: 'cand_01',
         topic: { it: 'Fisica', en: 'Physics' },
@@ -240,7 +241,10 @@ export class KnowledgeEngine {
       } else if (cand.votesFalse / totalVotes >= 0.34) {
         // REJECTED & PURGED!
         this.candidateQueue = this.candidateQueue.filter(c => c.id !== cand.id);
+        this._saveCandidateQueue();
       }
+    } else {
+      this._saveCandidateQueue();
     }
   }
 
@@ -283,7 +287,7 @@ export class KnowledgeEngine {
   submitNotion(topic, question, answer, lang = (i18n ? i18n.locale : 'it')) {
     if (!question || !answer) return;
 
-    const newId = `user_${Date.now()}`;
+    const newId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const cleanTopic = topic ? topic.trim() : (lang === 'en' ? 'General' : 'Generale');
 
     this.candidateQueue.push({
@@ -297,12 +301,52 @@ export class KnowledgeEngine {
       flags: 0
     });
 
+    this._saveCandidateQueue();
     console.log(`[KnowledgeEngine] New candidate submitted for topic "${cleanTopic}" [${lang}].`);
   }
 
+  /**
+   * Ingest a candidate question received from a peer across the P2P mesh
+   */
+  addRemoteCandidate(notion) {
+    if (!notion || !notion.question || !notion.answer) return;
+    const qClean = notion.question.trim();
+    // Prevent duplicate entries
+    const exists = this.candidateQueue.some(c => {
+      const q = typeof c.question === 'object' ? (c.question.it || c.question.en || '') : (c.question || '');
+      return q.toLowerCase() === qClean.toLowerCase();
+    });
+    if (exists) return;
+
+    const newId = notion.id || `remote_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    this.candidateQueue.push({
+      id: newId,
+      topic: notion.topic ? notion.topic.trim() : 'Generale',
+      question: qClean,
+      answer: notion.answer.trim(),
+      lang: notion.lang || 'it',
+      votesTrue: 1,
+      votesFalse: 0,
+      flags: 0
+    });
+    this._saveCandidateQueue();
+    console.log(`[KnowledgeEngine] Ingested remote candidate for topic "${notion.topic}".`);
+  }
+
   _promoteCandidate(cand) {
-    // Generate 3 simple plausible distractors or cloze choices
-    const distractors = ['Opzione A', 'Opzione B', 'Opzione C'];
+    // Generate 3 plausible distractors from other pool questions, or fallback
+    const otherAnswers = this.verifiedPool
+      .map(q => typeof q.answer === 'string' ? q.answer : (q.answer.it || q.answer.en || ''))
+      .filter(a => a && a !== cand.answer);
+
+    let distractors = [];
+    if (otherAnswers.length >= 3) {
+      const shuffled = [...otherAnswers].sort(() => Math.random() - 0.5);
+      distractors = shuffled.slice(0, 3);
+    } else {
+      distractors = ['Opzione A', 'Opzione B', 'Opzione C'];
+    }
+
     const options = [cand.answer, ...distractors].sort(() => Math.random() - 0.5);
 
     this.verifiedPool.push({
@@ -317,6 +361,7 @@ export class KnowledgeEngine {
     // Remove from queue
     this.candidateQueue = this.candidateQueue.filter(c => c.id !== cand.id);
     this._saveVerifiedPool();
+    this._saveCandidateQueue();
     console.log(`[KnowledgeEngine] Candidate ${cand.id} promoted to verified pool!`);
   }
 
@@ -327,6 +372,16 @@ export class KnowledgeEngine {
       }
     } catch (e) {
       console.warn('[KnowledgeEngine] Error persisting verified pool:', e);
+    }
+  }
+
+  _saveCandidateQueue() {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('bibo_candidate_queue', JSON.stringify(this.candidateQueue));
+      }
+    } catch (e) {
+      console.warn('[KnowledgeEngine] Error persisting candidate queue:', e);
     }
   }
 }
