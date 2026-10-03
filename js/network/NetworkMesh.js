@@ -134,18 +134,17 @@ export class NetworkMesh {
 
       room._rawSend = sendGossip;
 
-      const handleJoin = (peerId) => {
-        if (this.activePeers.size >= this.maxDegree) {
-          return;
-        }
-        this.activePeers.set(peerId, { source: type, lastSeen: Date.now() });
-        this._updatePeerMetrics();
+      const handleJoin = (trysteroPeerId) => {
+        // Broadcast full state with localPeerId so the new peer can immediately register us
         this.broadcastState();
+        // Also request the remote peer's state so we learn their sovereign peerId and data
+        this._emitGossip('REQUEST_SYNC', { senderId: this.localPeerId });
       };
 
-      const handleLeave = (peerId) => {
-        if (this.activePeers.has(peerId)) {
-          this.activePeers.delete(peerId);
+      const handleLeave = (trysteroPeerId) => {
+        // Trystero ephemeral connection dropped
+        if (this.activePeers.has(trysteroPeerId)) {
+          this.activePeers.delete(trysteroPeerId);
           this._updatePeerMetrics();
         }
       };
@@ -165,15 +164,28 @@ export class NetworkMesh {
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
     this.heartbeatTimer = setInterval(() => {
       const now = Date.now();
+      let changed = false;
       for (const [peerId, meta] of this.activePeers.entries()) {
-        if (now - meta.lastSeen > 35000) {
+        if (now - meta.lastSeen > 20000) {
           this.activePeers.delete(peerId);
+          changed = true;
         }
       }
-      this._updatePeerMetrics();
+      if (changed) {
+        this._updatePeerMetrics();
+      }
 
       this._emitGossip('HEARTBEAT', { senderId: this.localPeerId, timestamp: now });
     }, this.heartbeatIntervalMs);
+
+    // Register beforeunload and pagehide to broadcast instant peer departure
+    if (typeof window !== 'undefined') {
+      const handleUnload = () => {
+        this._emitGossip('PEER_LEAVE', { senderId: this.localPeerId });
+      };
+      window.addEventListener('beforeunload', handleUnload);
+      window.addEventListener('pagehide', handleUnload);
+    }
   }
 
   _updatePeerMetrics() {
@@ -219,6 +231,15 @@ export class NetworkMesh {
 
     switch (packet.type) {
       case 'HEARTBEAT':
+        break;
+      case 'PEER_LEAVE':
+        if (actualSender && this.activePeers.has(actualSender)) {
+          this.activePeers.delete(actualSender);
+          this._updatePeerMetrics();
+        }
+        break;
+      case 'REQUEST_SYNC':
+        this.broadcastState();
         break;
       case 'STATE_SYNC':
       case 'BIBO_P2P_SYNC':

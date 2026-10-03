@@ -465,7 +465,7 @@ body {
   height: 52px;
   padding: 8px 24px;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   border-top: none;
   background-color: transparent;
@@ -474,6 +474,10 @@ body {
 
 .bottom-hud .hud-left {
   justify-self: start;
+}
+
+.bottom-hud .needs-grid {
+  justify-self: center;
 }
 
 .bottom-hud .hud-right {
@@ -863,8 +867,8 @@ body {
     flex-shrink: 0;
     box-sizing: border-box;
     align-items: center;
-    border-top: 1px solid var(--border-color);
-    background-color: var(--bg-surface);
+    border-top: none;
+    background-color: transparent;
   }
 
   .needs-grid {

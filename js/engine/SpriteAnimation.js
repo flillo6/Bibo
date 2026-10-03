@@ -237,7 +237,9 @@ export class SpriteAnimationPlayer {
     const isSleep = (meta.groundY === 437 || meta.groundY === 495);
     const shadowX = width / 2;
     const isBaby = (meta.groundY === 452 || meta.groundY === 437);
-    const shadowY = Math.min(height - 10, sneakerGroundY + (isSleep ? 0 : (isBaby ? 3 : 5)));
+    // User requirement: For Evo 2 (mid) and Evo 3 (adult), shadow must go lower down (+14px under contact)
+    const evoOffsetY = isSleep ? 0 : (isBaby ? 3 : 14);
+    const shadowY = Math.min(height - 10, sneakerGroundY + evoOffsetY);
     const shadowRadiusX = targetWidth * (meta.shadowScaleX || 0.33);
     const shadowRadiusY = meta.shadowScaleY || 9;
 

@@ -782,10 +782,10 @@ class BiboApp {
     });
 
     document.querySelectorAll('[data-audio]').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
+      btn.addEventListener('click', (e) => {
         audioSynth.playClick();
         const type = e.target.getAttribute('data-audio');
-        await audioSynth.setAmbient(type);
+        audioSynth.setAmbient(type);
         audioPopover.classList.remove('active');
         
         let label = i18n.t('audio.mute');

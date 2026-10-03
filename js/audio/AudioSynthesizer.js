@@ -30,13 +30,12 @@ class AudioSynthesizer {
 
   /**
    * Set ambient background noise: 'mute', 'rain', or 'brown'
+   * Synchronous audio node startup to preserve mobile gesture activation.
    */
-  async setAmbient(type) {
+  setAmbient(type) {
     this._initContext();
     if (this.ctx && this.ctx.state === 'suspended') {
-      try {
-        await this.ctx.resume();
-      } catch (_) {}
+      this.ctx.resume().catch(() => {});
     }
 
     this.stopAmbient();
