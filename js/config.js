@@ -71,27 +71,27 @@ export const CONFIG = {
     VICTORY_HOP: 'victory_hop'      // Small hop when quiz answered correctly
   },
 
-  // Biological Needs & Decay Model
+  // Biological Needs & Decay Model (Responsive pace for rewarding pet care)
   NEEDS: {
     HUNGER: {
       initial: 80,
-      decayPerHour: 8,       // -8% every hour
+      decayPerHour: 18,      // -18% every hour (gets hungry in ~3-4 hours if unattended)
       snackBoost: 25,        // +25% per biscuit
-      criticalThreshold: 20  // Below 20% triggers idle_affamato
+      criticalThreshold: 25  // Below 25% shows hungry status
     },
     ENERGY: {
       initial: 85,
-      decayPerHour: 10,      // -10% every hour
-      sleepRegenPerHour: 15, // +15% every hour while sleeping
+      decayPerHour: 14,      // -14% every hour (gets tired across ~4-5 hours)
+      sleepRegenPerHour: 30, // +30% every hour while sleeping (restores full energy in ~3 hours)
       coffeeBoost: 25,       // +25% per cup of coffee/tea
       sleepThreshold: 15,    // Falls asleep when energy <= 15%
       wakeThreshold: 80      // Wakes up when energy >= 80%
     },
     CLEANLINESS: {
       initial: 90,
-      decayPerHour: 5,       // -5% every hour
+      decayPerHour: 12,      // -12% every hour (needs sponge cleaning every few hours)
       spongeBoost: 30,       // +30% per sponge
-      criticalThreshold: 20  // Below 20% triggers idle_sporco
+      criticalThreshold: 25  // Below 25% shows dusty status
     }
   },
 

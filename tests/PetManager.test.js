@@ -112,10 +112,10 @@ test('PetManager - Offline vitals persistence and time-elapsed decay calculation
 
   const pet = new PetManager();
 
-  // 2 hours elapsed = hunger lost: 2 * 8 = 16, energy lost: 2 * 10 = 20, clean lost: 2 * 5 = 10
-  assert.equal(Math.round(pet.hunger), 64);
-  assert.equal(Math.round(pet.energy), 60);
-  assert.equal(Math.round(pet.cleanliness), 70);
+  // 2 hours elapsed = hunger lost: 2 * 18 = 36 (80 - 36 = 44), energy lost: 2 * 14 = 28 (80 - 28 = 52), clean lost: 2 * 12 = 24 (80 - 24 = 56)
+  assert.equal(Math.round(pet.hunger), 44);
+  assert.equal(Math.round(pet.energy), 52);
+  assert.equal(Math.round(pet.cleanliness), 56);
   assert.equal(pet.pantry.biscuit, 0); // Zero start verified
   assert.equal(pet.globalExp, 0);       // Zero start verified
 });

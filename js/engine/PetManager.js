@@ -43,22 +43,7 @@ export class PetManager {
 
       // Apply natural decay for time elapsed while offline / closed
       if (savedVitals.lastTimestamp) {
-        const elapsedHours = Math.min(48, Math.max(0, (Date.now() - savedVitals.lastTimestamp) / (1000 * 60 * 60)));
-        if (elapsedHours > 0) {
-          this.hunger = Math.max(0, this.hunger - (elapsedHours * CONFIG.NEEDS.HUNGER.decayPerHour));
-          this.cleanliness = Math.max(0, this.cleanliness - (elapsedHours * CONFIG.NEEDS.CLEANLINESS.decayPerHour));
-          if (this.state === 'ASLEEP') {
-            this.energy = Math.min(100, this.energy + (elapsedHours * CONFIG.NEEDS.ENERGY.sleepRegenPerHour));
-            if (this.energy >= CONFIG.NEEDS.ENERGY.wakeThreshold) {
-              this.state = 'AWAKE';
-            }
-          } else {
-            this.energy = Math.max(0, this.energy - (elapsedHours * CONFIG.NEEDS.ENERGY.decayPerHour));
-            if (this.energy <= 5) {
-              this.state = 'ASLEEP';
-            }
-          }
-        }
+        this._applyElapsedDecay(savedVitals.lastTimestamp);
       }
     } else {
       this.hunger = CONFIG.NEEDS.HUNGER.initial;
@@ -132,15 +117,30 @@ export class PetManager {
     this.globalExp += amountExp;
     localStorage.setItem('bibo_user_contributed_exp', this.userContributedExp);
 
-    // Global Evolution is locked to baby until mid/adult sprites are finished
-    const reachedTarget = this.globalExp >= this.eraTargetExp;
+    // Dynamic Evolution Progression
+    let nextEvo = 'baby';
+    if (this.globalExp >= CONFIG.GLOBAL_PROGRESSION.TARGET_EXP_ERA_3) {
+      nextEvo = 'adult';
+    } else if (this.globalExp >= CONFIG.GLOBAL_PROGRESSION.TARGET_EXP_ERA_2) {
+      nextEvo = 'mid';
+    }
+
+    if (nextEvo !== this.activeEvolution) {
+      this.activeEvolution = nextEvo;
+      if (this.anim) {
+        this.anim.setEvolution(nextEvo);
+      }
+      if (this.onEvolution) {
+        this.onEvolution(nextEvo);
+      }
+    }
 
     this._notify(true);
     return {
       addedExp: amountExp,
       globalExp: this.globalExp,
       percent: this.globalExpPercent,
-      evolved: this.globalExp >= this.eraTargetExp
+      evolved: nextEvo !== 'baby'
     };
   }
 
@@ -201,11 +201,53 @@ export class PetManager {
   }
 
   /**
+   * Applies continuous decay based on elapsed timestamp (offline or tab backgrounded)
+   */
+  _applyElapsedDecay(fromTimestamp) {
+    if (!fromTimestamp) return;
+    const elapsedHours = Math.min(72, Math.max(0, (Date.now() - fromTimestamp) / (1000 * 60 * 60)));
+    if (elapsedHours <= 0.005) return; // Ignore sub-15-second blips
+
+    this.hunger = Math.max(0, this.hunger - (elapsedHours * CONFIG.NEEDS.HUNGER.decayPerHour));
+    this.cleanliness = Math.max(0, this.cleanliness - (elapsedHours * CONFIG.NEEDS.CLEANLINESS.decayPerHour));
+
+    if (this.state === 'ASLEEP') {
+      this.energy = Math.min(100, this.energy + (elapsedHours * CONFIG.NEEDS.ENERGY.sleepRegenPerHour));
+      if (this.energy >= CONFIG.NEEDS.ENERGY.wakeThreshold) {
+        this.state = 'AWAKE';
+      }
+    } else {
+      this.energy = Math.max(0, this.energy - (elapsedHours * CONFIG.NEEDS.ENERGY.decayPerHour));
+      if (this.energy <= 5) {
+        this.state = 'ASLEEP';
+      }
+    }
+  }
+
+  /**
+   * Refreshes decay when user returns to foreground / unlocks phone
+   */
+  refreshOfflineDecay() {
+    let saved = null;
+    try {
+      const raw = localStorage.getItem('bibo_pet_vitals');
+      if (raw) saved = JSON.parse(raw);
+    } catch (_) {}
+
+    if (saved && saved.lastTimestamp) {
+      this._applyElapsedDecay(saved.lastTimestamp);
+      this._saveVitals();
+      this._updateAnimationState();
+      this._notify();
+    }
+  }
+
+  /**
    * Periodic natural decay/regen tick (called every minute)
    */
   tickMinute() {
     if (this.state === 'ASLEEP') {
-      // Regenerate energy while sleeping (+15% / 60min)
+      // Regenerate energy while sleeping
       this.energy = Math.min(100, this.energy + (CONFIG.NEEDS.ENERGY.sleepRegenPerHour / 60));
       
       // Wake up condition: reaches wake threshold (80%)
@@ -229,6 +271,17 @@ export class PetManager {
     this._saveVitals();
     this._updateAnimationState();
     this._notify();
+
+    // Notify speech bubble of critical needs if awake
+    if (this.state === 'AWAKE' && this.onAnimStateChange) {
+      if (this.hunger <= CONFIG.NEEDS.HUNGER.criticalThreshold) {
+        this.onAnimStateChange(CONFIG.ANIMATIONS.IDLE_AFFAMATO);
+      } else if (this.energy <= 25) {
+        this.onAnimStateChange(CONFIG.ANIMATIONS.IDLE_STANCO);
+      } else if (this.cleanliness <= CONFIG.NEEDS.CLEANLINESS.criticalThreshold) {
+        this.onAnimStateChange(CONFIG.ANIMATIONS.IDLE_SPORCO);
+      }
+    }
   }
 
   /**

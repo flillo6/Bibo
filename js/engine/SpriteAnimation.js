@@ -65,8 +65,11 @@ export class SpriteAnimationPlayer {
         const isSleep = anim === CONFIG.ANIMATIONS.SLEEP;
         const loopStartFrame = isSleep ? 9 : 0;
         const isBaby = (evo === 'baby');
-        const yOffset = (isBaby && isSleep) ? 30 : 0;
-        const groundY = isBaby ? (isSleep ? 437 : 452) : (isSleep ? 494 : 504);
+        
+        // Scale and vertical offsets tailored to each evolution's frame proportions
+        const scale = isBaby ? 1.0 : 0.90;
+        const yOffset = isBaby ? (isSleep ? 30 : 0) : (isSleep ? -5 : -10);
+        const groundY = isBaby ? (isSleep ? 437 : 452) : (isSleep ? 495 : 490);
         const shadowScaleX = isSleep ? 0.44 : (isBaby ? 0.33 : 0.38);
         const shadowScaleY = isSleep ? 12 : (isBaby ? 9 : 11);
 
@@ -77,6 +80,7 @@ export class SpriteAnimationPlayer {
           fps: CONFIG.FRAME_RATE,
           loop: isLoop,
           loopStartFrame: loopStartFrame,
+          scale: scale,
           yOffset: yOffset,
           groundY: groundY,
           shadowScaleX: shadowScaleX,
@@ -222,25 +226,25 @@ export class SpriteAnimationPlayer {
     const dx = (width - targetWidth) / 2;
     const yOffset = meta.yOffset || 0;
     
-    // Position Bibo lower so his sneakers ground firmly near the base
+    // Position Bibo with yOffset
     const dy = ((height - targetHeight) * 0.5) + 16 + yOffset;
 
-    // Contact point of sneakers or sleeping body in 512 frame (452 for standing, 437 for sleeping)
+    // Contact point of sneakers or sleeping body in 512 frame
     const groundY = meta.groundY || 452;
     const sneakerGroundY = dy + (targetHeight * (groundY / fh));
 
-    // 1. Crisp grounding ellipse shadow placed precisely under Bibo (lower for standing sneakers)
-    const isSleep = (groundY === 437 || groundY === 494);
+    // 1. Crisp grounding ellipse shadow placed precisely under Bibo (firmly on canvas floor)
+    const isSleep = (meta.groundY === 437 || meta.groundY === 495);
     const shadowX = width / 2;
     const isBaby = (meta.groundY === 452 || meta.groundY === 437);
-    const shadowY = sneakerGroundY + (isSleep ? -2 : (isBaby ? 3 : 9));
+    const shadowY = Math.min(height - 10, sneakerGroundY + (isSleep ? 0 : (isBaby ? 3 : 5)));
     const shadowRadiusX = targetWidth * (meta.shadowScaleX || 0.33);
     const shadowRadiusY = meta.shadowScaleY || 9;
 
     this.ctx.save();
     this.ctx.beginPath();
     this.ctx.ellipse(shadowX, shadowY, shadowRadiusX, shadowRadiusY, 0, 0, Math.PI * 2);
-    this.ctx.fillStyle = 'rgba(46, 52, 64, 0.24)'; // Crisp grounding shadow
+    this.ctx.fillStyle = 'rgba(46, 52, 64, 0.28)'; // Crisp grounding shadow
     this.ctx.fill();
     this.ctx.restore();
 

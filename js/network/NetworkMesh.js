@@ -69,15 +69,15 @@ export class NetworkMesh {
 
     const torrentRelays = [
       'wss://tracker.openwebtorrent.com',
-      'wss://tracker.webtorrent.dev',
-      'wss://tracker.files.fm:7073/announce'
+      'wss://tracker.webtorrent.dev'
     ];
 
     const nostrRelays = [
-      'wss://relay.damus.io',
       'wss://nos.lol',
       'wss://nostr.mom',
-      'wss://relay.snort.social'
+      'wss://relay.snort.social',
+      'wss://nostr.wine',
+      'wss://relay.primal.net'
     ];
 
     await Promise.allSettled([
@@ -159,7 +159,7 @@ export class NetworkMesh {
       }
       this._updatePeerMetrics();
 
-      this._emitGossip('HEARTBEAT', { sender: this.localPeerId, timestamp: now });
+      this._emitGossip('HEARTBEAT', { senderId: this.localPeerId, timestamp: now });
     }, this.heartbeatIntervalMs);
   }
 
@@ -195,8 +195,13 @@ export class NetworkMesh {
     if (!packet || !packet.id || this.seenMessages.has(packet.id)) return;
     this._markAsSeen(packet.id);
 
-    if (this.activePeers.has(senderId)) {
-      this.activePeers.get(senderId).lastSeen = Date.now();
+    const actualSender = (packet.payload && packet.payload.senderId) || senderId || 'peer';
+    if (actualSender && actualSender !== this.localPeerId) {
+      const isNew = !this.activePeers.has(actualSender);
+      this.activePeers.set(actualSender, { source: 'gossip', lastSeen: Date.now() });
+      if (isNew) {
+        this._updatePeerMetrics();
+      }
     }
 
     switch (packet.type) {
@@ -204,11 +209,11 @@ export class NetworkMesh {
         break;
       case 'STATE_SYNC':
       case 'BIBO_P2P_SYNC':
-        this._mergeCRDTState(packet.payload, senderId);
+        this._mergeCRDTState(packet.payload, actualSender);
         break;
       case 'NOTION_BROADCAST':
       case 'BIBO_P2P_NOTION':
-        if (this.onNotionSync) this.onNotionSync(packet.payload, senderId);
+        if (this.onNotionSync) this.onNotionSync(packet.payload, actualSender);
         break;
     }
 

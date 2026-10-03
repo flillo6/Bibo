@@ -110,10 +110,11 @@ class BiboApp {
       console.log(`[NetworkMesh] Synchronized community notion for topic "${notion.topic}" from peer [${sourceId}]`);
     };
 
-    this.mesh.init();
     this.mesh.onPeerCountChange = () => {
       this._updateOnlineCount();
     };
+
+    this.mesh.init();
 
     // 5. Apply Theme & Locale
     this._applyTheme(this.profile.theme || 'warm_paper');
@@ -154,6 +155,10 @@ class BiboApp {
       this.isDocumentVisible = true;
       this.anim.isPlaying = true;
       this.anim.lastFrameTime = performance.now();
+      // Instantly recalculate natural biological decay for time spent away
+      if (this.pet && typeof this.pet.refreshOfflineDecay === 'function') {
+        this.pet.refreshOfflineDecay();
+      }
     }
   }
 
