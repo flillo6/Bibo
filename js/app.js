@@ -1072,49 +1072,7 @@ class BiboApp {
     document.getElementById('recoveryCloseBtn').addEventListener('click', handleRecoveryCancelOrClose);
     document.getElementById('recoveryCancelBtn').addEventListener('click', handleRecoveryCancelOrClose);
 
-    // 8. Temporary Test Controls (Evolutions & Animations)
-    const evoBtns = document.querySelectorAll('.evo-test-btn');
-    if (evoBtns.length > 0) {
-      evoBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-          audioSynth.playClick();
-          const evo = btn.getAttribute('data-evo');
-          evoBtns.forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          this.pet.setEvolutionStage(evo);
-          this._showSpeechBubble(`[TEST] Stadio: ${evo.toUpperCase()}`);
-        });
-      });
-    }
-
-    const animBtns = document.querySelectorAll('.anim-test-btn');
-    if (animBtns.length > 0) {
-      animBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-          audioSynth.playClick();
-          const animKey = btn.getAttribute('data-anim');
-          animBtns.forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          if (animKey === CONFIG.ANIMATIONS.IDLE_BASE) {
-            this.pet.state = 'AWAKE';
-            this.pet._updateAnimationState();
-          } else if (animKey === CONFIG.ANIMATIONS.SLEEP) {
-            this.pet.fallAsleep();
-          } else {
-            this.pet.state = 'AWAKE';
-            const durationMs = Math.round((12 / CONFIG.FRAME_RATE) * 1000); // 3000ms at 4 FPS
-            this.pet._playTemporaryAnimation(animKey, durationMs + 200);
-            setTimeout(() => {
-              animBtns.forEach(b => b.classList.remove('active'));
-              const idleBtn = document.querySelector('.anim-test-btn[data-anim="idle_base"]');
-              if (idleBtn) idleBtn.classList.add('active');
-            }, durationMs);
-          }
-        });
-      });
-    }
-
-    // 9. Make All Modals & Docks Draggable by Title Bar
+    // 8. Make All Modals & Docks Draggable by Title Bar
     this._makeDraggable(document.querySelector('#onboardingModal .modal-card'), document.querySelector('#onboardingModal .modal-header'));
     this._makeDraggable(document.querySelector('#finishModal .modal-card'), document.querySelector('#finishModal .modal-header'));
     this._makeDraggable(document.querySelector('#recoveryModal .modal-card'), document.querySelector('#recoveryModal .modal-header'));

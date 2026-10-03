@@ -59,7 +59,7 @@ export class NetworkMesh {
           urls: [
             'turn:openrelay.metered.ca:80',
             'turn:openrelay.metered.ca:443',
-            'turns:openrelay.metered.ca:443?transport=tcp'
+            'turn:openrelay.metered.ca:443?transport=tcp'
           ],
           username: 'openrelayproject',
           credential: 'openrelayprojectsecret'
@@ -71,8 +71,6 @@ export class NetworkMesh {
     const torrentRelays = [
       'wss://tracker.openwebtorrent.com',
       'wss://tracker.webtorrent.dev',
-      'wss://tracker.btorrent.xyz',
-      'wss://tracker.files.fm:7073/announce',
       'wss://open.ftorrent.com'
     ];
 
@@ -82,7 +80,6 @@ export class NetworkMesh {
       'wss://relay.snort.social',
       'wss://nostr.wine',
       'wss://relay.primal.net',
-      'wss://relay.damus.io',
       'wss://purplerelay.com'
     ];
 
@@ -91,7 +88,7 @@ export class NetworkMesh {
         urls: [
           'turn:openrelay.metered.ca:80',
           'turn:openrelay.metered.ca:443',
-          'turns:openrelay.metered.ca:443?transport=tcp'
+          'turn:openrelay.metered.ca:443?transport=tcp'
         ],
         username: 'openrelayproject',
         credential: 'openrelayprojectsecret'
@@ -141,17 +138,31 @@ export class NetworkMesh {
       room._rawSend = sendGossip;
 
       const handleJoin = (trysteroPeerId) => {
+        console.log(`[NetworkMesh] Peer joined on ${type}: ${trysteroPeerId}`);
+        // Immediately record active peer so peer count updates instantly
+        this.activePeers.set(trysteroPeerId, {
+          source: type,
+          trysteroId: trysteroPeerId,
+          lastSeen: Date.now()
+        });
+        this._updatePeerMetrics();
+
         // Broadcast full state with localPeerId so the new peer can immediately register us
         this.broadcastState();
-        // Also request the remote peer's state so we learn their sovereign peerId and data
-        this._emitGossip('REQUEST_SYNC', { senderId: this.localPeerId });
+
+        // Also schedule a secondary sync after 350ms to ensure WebRTC DataChannel has flushed
+        setTimeout(() => {
+          this.broadcastState();
+          this._emitGossip('REQUEST_SYNC', { senderId: this.localPeerId });
+        }, 350);
       };
 
       const handleLeave = (trysteroPeerId) => {
+        console.log(`[NetworkMesh] Peer left on ${type}: ${trysteroPeerId}`);
         // Find if this trysteroPeerId maps to a sovereign senderId
         let foundSender = null;
         for (const [peerId, meta] of this.activePeers.entries()) {
-          if (meta.trysteroId === trysteroPeerId) {
+          if (meta.trysteroId === trysteroPeerId || peerId === trysteroPeerId) {
             foundSender = peerId;
             break;
           }
@@ -176,11 +187,24 @@ export class NetworkMesh {
 
   _startHeartbeat() {
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    this.heartbeatIntervalMs = 8000;
     this.heartbeatTimer = setInterval(() => {
       const now = Date.now();
       let changed = false;
+
+      // Check active peers against 45s timeout and active RTCPeerConnection health
+      const activeTorrentPeers = (this.roomTorrent && typeof this.roomTorrent.getPeers === 'function')
+        ? Object.keys(this.roomTorrent.getPeers())
+        : [];
+      const activeNostrPeers = (this.roomNostr && typeof this.roomNostr.getPeers === 'function')
+        ? Object.keys(this.roomNostr.getPeers())
+        : [];
+      const liveTrysteroPeers = new Set([...activeTorrentPeers, ...activeNostrPeers]);
+
       for (const [peerId, meta] of this.activePeers.entries()) {
-        if (now - meta.lastSeen > 20000) {
+        const isStillConnected = meta.trysteroId && liveTrysteroPeers.has(meta.trysteroId);
+        // Only prune if peer is not connected via WebRTC AND hasn't sent heartbeat for 45s
+        if (!isStillConnected && (now - meta.lastSeen > 45000)) {
           this.activePeers.delete(peerId);
           changed = true;
         }
@@ -236,6 +260,10 @@ export class NetworkMesh {
 
     const actualSender = (packet.payload && packet.payload.senderId) || senderId || 'peer';
     if (actualSender && actualSender !== this.localPeerId) {
+      // If we previously recorded by raw trysteroId, replace with sovereign actualSender
+      if (senderId && senderId !== actualSender && this.activePeers.has(senderId)) {
+        this.activePeers.delete(senderId);
+      }
       const isNew = !this.activePeers.has(actualSender);
       this.activePeers.set(actualSender, { source: 'gossip', trysteroId: senderId, lastSeen: Date.now() });
       if (isNew) {
@@ -310,6 +338,7 @@ export class NetworkMesh {
       cleanliness: this.pet.cleanliness,
       state: this.pet.state,
       customTopics,
+      lastActionTimestamp: this.pet.lastActionTimestamp || 0,
       timestamp: Date.now()
     };
     this._emitGossip('STATE_SYNC', payload);

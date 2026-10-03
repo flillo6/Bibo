@@ -8,18 +8,18 @@
  * - Native iOS & Android PWA live revalidation
  */
 
-const CACHE_NAME = 'bibo-pwa-v6.1';
+const CACHE_NAME = 'bibo-pwa-v6.2';
 
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './css/style.css?v=6.1',
+  './css/style.css?v=6.2',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
   './js/config.js',
   './js/i18n.js',
-  './js/app.js?v=6.1',
+  './js/app.js?v=6.2',
   './js/audio/AudioSynthesizer.js',
   './js/engine/SpriteAnimation.js',
   './js/engine/PetManager.js',
@@ -98,8 +98,13 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (!url.protocol.startsWith('http')) return;
 
-  // 1. Navigation requests: Network-First with Cache Fallback (avoids stale cache on deploy)
-  if (event.request.mode === 'navigate' || url.pathname.endsWith('/') || url.pathname.endsWith('index.html')) {
+  // 1. Navigation & Script requests: Network-First with Cache Fallback (guarantees instant mesh & app updates on reload)
+  if (
+    event.request.mode === 'navigate' ||
+    url.pathname.endsWith('/') ||
+    url.pathname.endsWith('index.html') ||
+    url.pathname.endsWith('.js')
+  ) {
     event.respondWith(
       fetch(event.request)
         .then((networkResponse) => {
@@ -109,7 +114,7 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         })
-        .catch(() => caches.match('./index.html') || caches.match('./'))
+        .catch(() => caches.match(event.request, { ignoreSearch: true }) || caches.match('./index.html') || caches.match('./'))
     );
     return;
   }

@@ -1,9 +1,11 @@
+import './setup.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PetManager } from '../js/engine/PetManager.js';
 import { NetworkMesh } from '../js/network/NetworkMesh.js';
 
 test('NetworkMesh - Monotonic EXP and CRDT vitals reconciliation', () => {
+  localStorage.clear();
   const pet = new PetManager();
   pet.globalExp = 100;
   pet.hunger = 80;
@@ -31,6 +33,7 @@ test('NetworkMesh - Monotonic EXP and CRDT vitals reconciliation', () => {
 });
 
 test('NetworkMesh - Triggers onTopicsSync callback on receiving custom topics', () => {
+  localStorage.clear();
   const pet = new PetManager();
   const mesh = new NetworkMesh(pet);
 
@@ -52,10 +55,12 @@ test('NetworkMesh - Triggers onTopicsSync callback on receiving custom topics', 
 });
 
 test('NetworkMesh - Collective Memory: Stale offline peer cannot overwrite newer peer feeding', () => {
+  localStorage.clear();
   const pet = new PetManager();
   const now = Date.now();
   const t0 = now - 7200000; // 2 hours ago
   pet.lastVitalsTimestamp = t0;
+  pet.lastActionTimestamp = t0;
   pet.hunger = 40;
 
   const mesh = new NetworkMesh(pet);

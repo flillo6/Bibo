@@ -41,6 +41,7 @@ export class PetManager {
       this.cleanliness = typeof savedVitals.cleanliness === 'number' ? savedVitals.cleanliness : CONFIG.NEEDS.CLEANLINESS.initial;
       this.state = savedVitals.state || 'AWAKE';
       this.lastVitalsTimestamp = typeof savedVitals.lastTimestamp === 'number' ? savedVitals.lastTimestamp : Date.now();
+      this.lastActionTimestamp = typeof savedVitals.lastActionTimestamp === 'number' ? savedVitals.lastActionTimestamp : 0;
 
       // Apply natural decay for time elapsed while offline / closed
       if (savedVitals.lastTimestamp) {
@@ -52,6 +53,7 @@ export class PetManager {
       this.cleanliness = CONFIG.NEEDS.CLEANLINESS.initial;
       this.state = 'AWAKE';
       this.lastVitalsTimestamp = Date.now();
+      this.lastActionTimestamp = 0;
     }
     
     // Configurable Global Evolution Milestones (from CONFIG.GLOBAL_PROGRESSION)
@@ -69,7 +71,13 @@ export class PetManager {
     };
 
     // Biological States: 'AWAKE' | 'ASLEEP'
-    this.activeEvolution = 'baby';
+    if (this.globalExp >= CONFIG.GLOBAL_PROGRESSION.TARGET_EXP_ERA_3) {
+      this.activeEvolution = 'adult';
+    } else if (this.globalExp >= CONFIG.GLOBAL_PROGRESSION.TARGET_EXP_ERA_2) {
+      this.activeEvolution = 'mid';
+    } else {
+      this.activeEvolution = 'baby';
+    }
     this.isTestEvoLocked = false;
 
     // Persist vitals immediately
@@ -167,45 +175,65 @@ export class PetManager {
         energy: Math.round(this.energy * 10) / 10,
         cleanliness: Math.round(this.cleanliness * 10) / 10,
         state: this.state,
-        lastTimestamp: this.lastVitalsTimestamp
+        lastTimestamp: this.lastVitalsTimestamp,
+        lastActionTimestamp: this.lastActionTimestamp || 0
       }));
     }
   }
 
   /**
-   * Adopts remote collective state if it is fresher than our local timestamp.
-   * If remote is newer, applies natural decay ONLY from remote.timestamp to now.
+   * Adopts remote collective state based on user care interaction timestamp (CRDT consensus).
+   * If remote has a newer user care action, adopts remote values and applies elapsed decay to now.
+   * If equal, aligns to the lowest vitals (consensus on decay) so peers do not diverge.
    */
   adoptRemoteState(remote) {
     if (!remote || typeof remote !== 'object') return false;
-    const remoteTs = typeof remote.timestamp === 'number' ? remote.timestamp : 0;
-    if (remoteTs < (this.lastVitalsTimestamp || 0)) {
-      return false; // Local is strictly fresher
+    const remoteActionTs = typeof remote.lastActionTimestamp === 'number'
+      ? remote.lastActionTimestamp
+      : (typeof remote.timestamp === 'number' ? remote.timestamp : 0);
+    const localActionTs = this.lastActionTimestamp || 0;
+
+    // A. Remote has a fresher user care interaction: remote is authoritative!
+    if (remoteActionTs > localActionTs) {
+      if (typeof remote.hunger === 'number') this.hunger = Math.max(0, Math.min(100, remote.hunger));
+      if (typeof remote.energy === 'number') this.energy = Math.max(0, Math.min(100, remote.energy));
+      if (typeof remote.cleanliness === 'number') this.cleanliness = Math.max(0, Math.min(100, remote.cleanliness));
+      if (remote.state) this.state = remote.state;
+      this.lastActionTimestamp = remoteActionTs;
+
+      // Apply decay strictly from the remote action timestamp to now
+      this._applyElapsedDecay(remoteActionTs);
+      this._saveVitals();
+      this._updateAnimationState();
+      this._notify(false);
+      return true;
     }
 
-    // Remote is fresher: accept remote values as authoritative base
-    if (typeof remote.hunger === 'number') this.hunger = Math.max(0, Math.min(100, remote.hunger));
-    if (typeof remote.energy === 'number') this.energy = Math.max(0, Math.min(100, remote.energy));
-    if (typeof remote.cleanliness === 'number') this.cleanliness = Math.max(0, Math.min(100, remote.cleanliness));
-    if (remote.state) this.state = remote.state;
-
-    // Apply natural decay only for time elapsed since the peer's interaction
-    this._applyElapsedDecay(remoteTs);
-    this.lastVitalsTimestamp = Date.now();
-
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('bibo_pet_vitals', JSON.stringify({
-        hunger: Math.round(this.hunger * 10) / 10,
-        energy: Math.round(this.energy * 10) / 10,
-        cleanliness: Math.round(this.cleanliness * 10) / 10,
-        state: this.state,
-        lastTimestamp: this.lastVitalsTimestamp
-      }));
+    // B. Both have equal action timestamps (e.g. neither has interacted since boot):
+    // Align with the peer with lower vitals (older/more decayed companion) to prevent divergence
+    if (remoteActionTs === localActionTs) {
+      let changed = false;
+      if (typeof remote.hunger === 'number' && remote.hunger < this.hunger) {
+        this.hunger = remote.hunger;
+        changed = true;
+      }
+      if (typeof remote.cleanliness === 'number' && remote.cleanliness < this.cleanliness) {
+        this.cleanliness = remote.cleanliness;
+        changed = true;
+      }
+      if (typeof remote.energy === 'number' && remote.energy < this.energy) {
+        this.energy = remote.energy;
+        changed = true;
+      }
+      if (changed) {
+        this._saveVitals();
+        this._updateAnimationState();
+        this._notify(false);
+        return true;
+      }
     }
 
-    this._updateAnimationState();
-    this._notify(false);
-    return true;
+    return false;
   }
 
   _notify(broadcast = true) {
@@ -339,6 +367,7 @@ export class PetManager {
       this.reactionTimeout = null;
     }
     this.state = 'ASLEEP';
+    this.lastActionTimestamp = Date.now();
     if (this.anim) {
       this.anim.play(CONFIG.ANIMATIONS.SLEEP, true);
     }
@@ -356,12 +385,13 @@ export class PetManager {
     if (this.reactionTimeout) {
       clearTimeout(this.reactionTimeout);
       this.reactionTimeout = null;
+    }
+    this.state = 'AWAKE';
+    this.lastActionTimestamp = Date.now();
+    this._saveVitals();
+    this._updateAnimationState();
+    this._notify();
   }
-  this.state = 'AWAKE';
-  this._saveVitals();
-  this._updateAnimationState();
-  this._notify();
-}
 
   /**
    * Set active evolution stage for testing and progression
@@ -395,6 +425,7 @@ export class PetManager {
     this.pantry.biscuit--;
     this._savePantry();
     this.hunger = Math.min(100, this.hunger + CONFIG.NEEDS.HUNGER.snackBoost);
+    this.lastActionTimestamp = Date.now();
     this._saveVitals();
 
     // Caring for Bibo donates global EXP
@@ -422,6 +453,7 @@ export class PetManager {
     this.pantry.coffee--;
     this._savePantry();
     this.energy = Math.min(100, this.energy + CONFIG.NEEDS.ENERGY.coffeeBoost);
+    this.lastActionTimestamp = Date.now();
     this._saveVitals();
 
     // Offering coffee donates global EXP
@@ -462,6 +494,7 @@ export class PetManager {
     this.pantry.sponge--;
     this._savePantry();
     this.cleanliness = Math.min(100, this.cleanliness + CONFIG.NEEDS.CLEANLINESS.spongeBoost);
+    this.lastActionTimestamp = Date.now();
     this._saveVitals();
 
     // Cleaning Bibo donates global EXP
