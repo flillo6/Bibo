@@ -21,19 +21,21 @@ class MockLocalStorage {
   }
 }
 
-if (!globalThis.localStorage) {
-  globalThis.localStorage = new MockLocalStorage();
-}
+globalThis.localStorage = new MockLocalStorage();
 
 // Unref Node.js BroadcastChannel so unit tests exit instantaneously without hanging the event loop
-if (globalThis.BroadcastChannel) {
-  const OrigBC = globalThis.BroadcastChannel;
-  globalThis.BroadcastChannel = class extends OrigBC {
-    constructor(name) {
-      super(name);
-      if (typeof this.unref === 'function') {
-        this.unref();
+if (typeof globalThis.BroadcastChannel !== 'undefined') {
+  try {
+    const OrigBC = globalThis.BroadcastChannel;
+    globalThis.BroadcastChannel = class extends OrigBC {
+      constructor(name) {
+        super(name);
+        try {
+          if (typeof this.unref === 'function') {
+            this.unref();
+          }
+        } catch (_) {}
       }
-    }
-  };
+    };
+  } catch (_) {}
 }
