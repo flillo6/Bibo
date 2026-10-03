@@ -8,3 +8,4 @@ import './PetManager.test.js';
 import './KnowledgeEngine.test.js';
 import './StudyTimer.test.js';
 import './ProfileStorage.test.js';
+import './NetworkMesh.test.js';

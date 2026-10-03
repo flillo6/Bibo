@@ -17,7 +17,7 @@
   <link rel="icon" type="image/png" href="assets/icons/icon-192.png">
   <link rel="manifest" href="manifest.json">
 
-  <link rel="stylesheet" href="css/style.css?v=4.0">
+  <link rel="stylesheet" href="css/style.css?v=5.0">
 </head>
 <body>
 
@@ -367,22 +367,32 @@
   </div>
 
   <!-- Main Application Coordinator Entry Point with Cache Buster -->
-  <script type="module" src="js/app.js?v=4.0"></script>
+  <script type="module" src="js/app.js?v=5.0"></script>
 
-  <!-- PWA Service Worker Registration with Auto-Update Check -->
+  <!-- PWA Service Worker Registration with Auto-Update & Mobile Standalone Live Refresh -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
+        navigator.serviceWorker.register('./sw.js?v=5.0')
           .then((reg) => {
-            // Check for updates on every page load
+            // Check for updates on initial page load
             reg.update();
+
+            // Actively check for updates when user brings PWA back to foreground (iOS WebClip / Android)
+            document.addEventListener('visibilitychange', () => {
+              if (document.visibilityState === 'visible') {
+                reg.update();
+              }
+            });
+            window.addEventListener('focus', () => reg.update());
+            window.addEventListener('pageshow', () => reg.update());
+
             reg.addEventListener('updatefound', () => {
               const newWorker = reg.installing;
               if (newWorker) {
                 newWorker.addEventListener('statechange', () => {
                   if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    console.log('[PWA] New version ready, reloading cleanly...');
+                    console.log('[PWA] New version installed! Reloading seamlessly...');
                     window.location.reload();
                   }
                 });

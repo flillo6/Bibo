@@ -75,6 +75,41 @@ class BiboApp {
 
     // 4b. Initialize Zero-Cost P2P WebRTC Mesh Network
     this.mesh = new NetworkMesh(this.pet);
+
+    this.mesh.getCustomTopics = () => {
+      const baseTopics = this.knowledge.getTopicsList(i18n.locale);
+      const customTopics = (this.profile.customTopics || []).map(t => typeof t === 'string' ? t : (t[i18n.locale] || t.it || t.en || ''));
+      return Array.from(new Set([...baseTopics, ...customTopics, this.activeTopic])).filter(Boolean);
+    };
+
+    this.mesh.onTopicsSync = (incomingTopics) => {
+      let added = false;
+      for (const t of incomingTopics) {
+        if (typeof t === 'string' && t.trim()) {
+          const clean = t.trim();
+          if (!this.profile.customTopics) this.profile.customTopics = [];
+          if (!this.profile.customTopics.includes(clean)) {
+            this.profile.customTopics.push(clean);
+            added = true;
+          }
+        }
+      }
+      if (added) {
+        profileStorage.saveProfile();
+        const popover = document.getElementById('topicPopover');
+        if (popover && popover.classList.contains('active')) {
+          this._renderTopicSuggestions(document.getElementById('topicSearchInput').value);
+        }
+      }
+    };
+
+    this.mesh.onNotionSync = (notion, sourceId) => {
+      if (!notion || !notion.topic || !notion.question) return;
+      this.knowledge.submitNotion(notion.topic, notion.question, notion.answer, notion.lang || i18n.locale);
+      profileStorage.addCustomTopic(notion.topic);
+      console.log(`[NetworkMesh] Synchronized community notion for topic "${notion.topic}" from peer [${sourceId}]`);
+    };
+
     this.mesh.init();
     this.mesh.onPeerCountChange = () => {
       this._updateOnlineCount();
@@ -514,13 +549,23 @@ class BiboApp {
   }
 
   _handleDonateSubmit() {
-    const q = document.getElementById('donateQuestionInput').value;
-    const a = document.getElementById('donateAnswerInput').value;
+    const q = document.getElementById('donateQuestionInput').value.trim();
+    const a = document.getElementById('donateAnswerInput').value.trim();
     if (q && a) {
       this.knowledge.submitNotion(this.activeTopic, q, a, i18n.locale);
+      profileStorage.addCustomTopic(this.activeTopic);
       audioSynth.playDonate();
       const expGain = CONFIG.GLOBAL_PROGRESSION ? CONFIG.GLOBAL_PROGRESSION.EXP_NOTION_DONATED : 10;
       this.pet.gainExp(expGain, 'donate');
+      if (this.mesh) {
+        this.mesh.broadcastNotion({
+          topic: this.activeTopic,
+          question: q,
+          answer: a,
+          lang: i18n.locale
+        });
+        this.mesh.broadcastState();
+      }
     }
     this._closeModal('finishModal');
   }
@@ -1056,6 +1101,9 @@ class BiboApp {
     this.profile.currentTopic = clean;
     profileStorage.addCustomTopic(clean);
     document.getElementById('topicChipText').textContent = clean.toUpperCase();
+    if (this.mesh) {
+      this.mesh.broadcastState();
+    }
   }
 
   _updateNeedsUI(state) {

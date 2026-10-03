@@ -5,27 +5,31 @@
  * - Cache-First strategy with Stale-While-Revalidate for static assets
  * - Instant offline boot for student deep work without internet
  * - Automatic cache cleanup on version updates
+ * - Native iOS & Android PWA live revalidation
  */
 
-const CACHE_NAME = 'bibo-pwa-v4.0';
+const CACHE_NAME = 'bibo-pwa-v5.0';
 
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './css/style.css?v=4.0',
+  './css/style.css?v=5.0',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
   './js/config.js',
   './js/i18n.js',
-  './js/app.js?v=4.0',
+  './js/app.js?v=5.0',
   './js/audio/AudioSynthesizer.js',
   './js/engine/SpriteAnimation.js',
   './js/engine/PetManager.js',
   './js/engine/StudyTimer.js',
   './js/knowledge/StarterPack.js',
   './js/knowledge/KnowledgeEngine.js',
+  './js/network/NetworkMesh.js',
   './js/storage/ProfileStorage.js',
+  './js/vendor/trystero-torrent.js',
+  './js/vendor/trystero-nostr.js',
   './assets/sprites/baby/idle_base.png',
   './assets/sprites/baby/idle_affamato.png',
   './assets/sprites/baby/idle_stanco.png',
@@ -41,7 +45,7 @@ const STATIC_ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[ServiceWorker] Pre-caching offline assets...');
+      console.log('[ServiceWorker] Pre-caching offline assets for v5.0...');
       return cache.addAll(STATIC_ASSETS);
     }).then(() => self.skipWaiting())
   );

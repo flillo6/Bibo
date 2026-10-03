@@ -727,17 +727,28 @@ body {
 /* ==================== MOBILE & TABLET RESPONSIVENESS ==================== */
 
 @media (max-width: 768px) {
-  html, body {
-    height: 100vh;
-    height: 100dvh;
-    max-height: 100dvh;
-    width: 100vw;
+  html {
+    height: 100%;
+    width: 100%;
     overflow: hidden;
+  }
+
+  body {
     position: fixed;
     top: 0;
     left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
     padding-top: env(safe-area-inset-top, 0px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: 0px;
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: env(safe-area-inset-right, 0px);
     touch-action: manipulation;
@@ -820,11 +831,15 @@ body {
     min-height: 32px;
   }
 
-  /* Bottom HUD on mobile - Ergonomic Two-Tiered Retro Control Bar */
+  /* Bottom HUD on mobile - Ergonomic Two-Tiered Retro Control Bar pinned to screen bottom */
   .bottom-hud {
     height: auto;
     min-height: 76px;
-    padding: 6px 16px max(14px, env(safe-area-inset-bottom, 14px));
+    margin-top: auto !important;
+    margin-bottom: 0 !important;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 6px 16px max(18px, env(safe-area-inset-bottom, 22px));
     display: grid;
     grid-template-areas:
       "needs needs"
@@ -834,7 +849,6 @@ body {
     column-gap: 12px;
     width: 100%;
     max-width: 360px;
-    margin: 0 auto;
     flex-shrink: 0;
     box-sizing: border-box;
     align-items: center;

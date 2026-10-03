@@ -2,12 +2,14 @@
  * BIBO - NetworkMesh (Zero-Cost Decentralized P2P Synchronization)
  * 
  * Architecture:
- * - Pure client-side WebRTC DataChannels with Nostr / BitTorrent tracker discovery.
+ * - Pure client-side WebRTC DataChannels with WebTorrent tracker & Nostr relay discovery.
  * - Zero OpEx (€0.00 / month forever): no central server, no Redis, no WebSocket bills.
  * - Conflict-Free Replicated Data Type (CRDT) state reconciliation:
  *   - Global EXP: monotonic max accumulation.
  *   - Pantry stock: deterministic delta resolution.
- * - Bridges PetManager events across devices in real time.
+ *   - Collective biological vitals (hunger, energy, cleanliness, sleep state).
+ *   - Sovereign peer-to-peer knowledge & topics mesh.
+ * - Bridges PetManager and KnowledgeEngine events across devices in real time.
  */
 
 export class NetworkMesh {
@@ -15,48 +17,83 @@ export class NetworkMesh {
     this.pet = petManager;
     this.roomId = roomId;
     this.peers = new Set();
-    this.peerCount = 0;
+    this.peerCount = 1; // Start with 1 (self is online)
     this.onPeerCountChange = null;
+    this.onTopicsSync = null;
+    this.onNotionSync = null;
+    this.getCustomTopics = null;
     this.isInitialized = false;
     this.lastVitalsSyncTimestamp = 0;
 
-    // Local-First BroadcastChannel fallback (always available)
+    // Local-First BroadcastChannel fallback (always available for tabs on the same profile)
     this.localChannel = typeof BroadcastChannel !== 'undefined'
       ? new BroadcastChannel('bibo_mesh_local_v1')
       : null;
 
     if (this.localChannel) {
-      this.localChannel.onmessage = (e) => this._handleIncomingMessage(e.data, 'local');
+      this.localChannel.onmessage = (e) => {
+        if (!e.data) return;
+        if (e.data.type === 'BIBO_P2P_SYNC') {
+          this._handleIncomingMessage(e.data, 'local');
+        } else if (e.data.type === 'BIBO_P2P_NOTION') {
+          if (this.onNotionSync) {
+            this.onNotionSync(e.data.payload, 'local');
+          }
+        }
+      };
     }
   }
 
   /**
-   * Initializes P2P WebRTC discovery mesh
+   * Initializes P2P WebRTC discovery mesh via local bundled WebTorrent or Nostr connectors
    */
   async init() {
     if (this.isInitialized) return;
     this.isInitialized = true;
 
     try {
-      // Dynamic import of Trystero Torrent WebRTC connector with Nostr fallback
       let trysteroModule = null;
+      let usedConnector = 'torrent';
+
+      // 1. Try local vendored WebTorrent bundle
       try {
-        trysteroModule = await import('https://esm.sh/trystero/torrent');
-      } catch (_) {
+        trysteroModule = await import('../vendor/trystero-torrent.js');
+      } catch (errTorrent) {
+        console.warn('[NetworkMesh] Torrent bundle load failed, trying Nostr bundle:', errTorrent);
         try {
-          trysteroModule = await import('https://esm.sh/trystero/nostr');
-        } catch (_) {}
+          trysteroModule = await import('../vendor/trystero-nostr.js');
+          usedConnector = 'nostr';
+        } catch (errNostr) {
+          console.warn('[NetworkMesh] Nostr bundle load failed:', errNostr);
+        }
       }
 
       if (trysteroModule && trysteroModule.joinRoom) {
-        const config = { appId: 'bibo-16bit-global-study' };
+        const config = usedConnector === 'torrent'
+          ? {
+              appId: 'bibo-16bit-global-study',
+              trackerUrls: [
+                'wss://tracker.openwebtorrent.com',
+                'wss://tracker.webtorrent.dev'
+              ]
+            }
+          : {
+              appId: 'bibo-16bit-global-study',
+              relayUrls: [
+                'wss://relay.damus.io',
+                'wss://nos.lol',
+                'wss://nostr.mom'
+              ]
+            };
+
         this.room = trysteroModule.joinRoom(config, this.roomId);
 
         // Actions
         const [sendSync, getSync] = this.room.makeAction('sync');
-        const [sendPing, getPing] = this.room.makeAction('ping');
+        const [sendNotion, getNotion] = this.room.makeAction('notion');
 
         this._sendSync = sendSync;
+        this._sendNotion = sendNotion;
 
         // Peer join/leave listeners
         this.room.onPeerJoin((peerId) => {
@@ -64,7 +101,7 @@ export class NetworkMesh {
           this.peerCount = this.peers.size + 1; // +1 for self
           if (this.onPeerCountChange) this.onPeerCountChange(this.peerCount);
 
-          // Greet new peer with our current state snapshot
+          // Greet new peer with our current state snapshot & known topics
           this.broadcastState();
           console.log(`[NetworkMesh] P2P Peer connected: ${peerId}. Mesh count: ${this.peerCount}`);
         });
@@ -76,12 +113,18 @@ export class NetworkMesh {
           console.log(`[NetworkMesh] P2P Peer disconnected: ${peerId}. Mesh count: ${this.peerCount}`);
         });
 
-        // Incoming remote sync action
+        // Incoming remote actions
         getSync((data, peerId) => {
           this._handleIncomingMessage(data, peerId);
         });
 
-        console.log('[NetworkMesh] P2P WebRTC mesh online via public Nostr relays.');
+        getNotion((data, peerId) => {
+          if (this.onNotionSync) {
+            this.onNotionSync(data, peerId);
+          }
+        });
+
+        console.log(`[NetworkMesh] P2P WebRTC mesh online via ${usedConnector.toUpperCase()}. Self ID: ${trysteroModule.selfId || 'local'}`);
       } else {
         console.log('[NetworkMesh] Running in sovereign Local-First mode (BroadcastChannel).');
       }
@@ -91,9 +134,11 @@ export class NetworkMesh {
   }
 
   /**
-   * Broadcast local state change to all connected P2P peers and local tabs
+   * Broadcast local state change and topics to all connected P2P peers and local tabs
    */
   broadcastState() {
+    const customTopics = this.getCustomTopics ? this.getCustomTopics() : [];
+
     const payload = {
       globalExp: this.pet.globalExp,
       userContributedExp: this.pet.userContributedExp,
@@ -102,6 +147,7 @@ export class NetworkMesh {
       energy: this.pet.energy,
       cleanliness: this.pet.cleanliness,
       state: this.pet.state,
+      customTopics,
       timestamp: Date.now()
     };
 
@@ -123,6 +169,29 @@ export class NetworkMesh {
   }
 
   /**
+   * Broadcast a newly donated community notion across the P2P mesh
+   */
+  broadcastNotion(notion) {
+    if (!notion) return;
+
+    // 1. Broadcast to local tabs
+    if (this.localChannel) {
+      try {
+        this.localChannel.postMessage({ type: 'BIBO_P2P_NOTION', payload: notion });
+      } catch (e) {}
+    }
+
+    // 2. Broadcast to WebRTC P2P peers
+    if (this._sendNotion && this.peers.size > 0) {
+      try {
+        this._sendNotion(notion);
+      } catch (e) {
+        console.warn('[NetworkMesh] Send notion failed:', e);
+      }
+    }
+  }
+
+  /**
    * CRDT Reconciliation of incoming remote state
    */
   _handleIncomingMessage(msg, sourceId) {
@@ -132,7 +201,7 @@ export class NetworkMesh {
     let changed = false;
 
     // 1. Monotonic EXP reconciliation (take maximum knowledge achieved)
-    if (p.globalExp > this.pet.globalExp) {
+    if (typeof p.globalExp === 'number' && p.globalExp > this.pet.globalExp) {
       this.pet.globalExp = p.globalExp;
       changed = true;
     }
@@ -162,6 +231,13 @@ export class NetworkMesh {
         }
         this.lastVitalsSyncTimestamp = p.timestamp;
         changed = true;
+      }
+    }
+
+    // 4. Custom Topics Synchronization across community
+    if (Array.isArray(p.customTopics) && p.customTopics.length > 0) {
+      if (this.onTopicsSync) {
+        this.onTopicsSync(p.customTopics, sourceId);
       }
     }
 
