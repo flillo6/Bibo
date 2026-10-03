@@ -18,6 +18,7 @@ export class NetworkMesh {
     this.peerCount = 0;
     this.onPeerCountChange = null;
     this.isInitialized = false;
+    this.lastVitalsSyncTimestamp = 0;
 
     // Local-First BroadcastChannel fallback (always available)
     this.localChannel = typeof BroadcastChannel !== 'undefined'
@@ -144,11 +145,26 @@ export class NetworkMesh {
       }
     }
 
+    // 3. Collective Biological Vitals & State (One shared Bibo for the entire community)
+    if (p.timestamp && p.timestamp > this.lastVitalsSyncTimestamp) {
+      if (typeof p.hunger === 'number' && typeof p.energy === 'number' && typeof p.cleanliness === 'number') {
+        this.pet.hunger = Math.max(0, Math.min(100, p.hunger));
+        this.pet.energy = Math.max(0, Math.min(100, p.energy));
+        this.pet.cleanliness = Math.max(0, Math.min(100, p.cleanliness));
+        if (p.state === 'AWAKE' || p.state === 'ASLEEP') {
+          this.pet.state = p.state;
+        }
+        this.lastVitalsSyncTimestamp = p.timestamp;
+        changed = true;
+      }
+    }
+
     if (changed) {
       this.pet._savePantry();
+      this.pet._saveVitals();
       this.pet._updateAnimationState();
       this.pet._notify(false);
-      console.log(`[NetworkMesh] Synchronized state with peer [${sourceId}]. EXP: ${this.pet.globalExp}`);
+      console.log(`[NetworkMesh] Synchronized collective Bibo from peer [${sourceId}]. EXP: ${this.pet.globalExp}`);
     }
   }
 }
