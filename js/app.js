@@ -76,11 +76,8 @@ class BiboApp {
     // 4b. Initialize Zero-Cost P2P WebRTC Mesh Network
     this.mesh = new NetworkMesh(this.pet);
     this.mesh.init();
-    this.mesh.onPeerCountChange = (count) => {
-      const el = document.getElementById('onlineCountText');
-      if (el && count > 1) {
-        el.textContent = `[●] ${count} DISPOSITIVI P2P`;
-      }
+    this.mesh.onPeerCountChange = () => {
+      this._updateOnlineCount();
     };
 
     // 5. Apply Theme & Locale
@@ -137,6 +134,13 @@ class BiboApp {
     }
   }
 
+  _updateOnlineCount() {
+    const count = (this.mesh && this.mesh.peerCount) ? this.mesh.peerCount : 1;
+    const text = i18n.t('app.status.online', { count: count.toLocaleString() });
+    const el = document.getElementById('onlineCountText');
+    if (el) el.textContent = text;
+  }
+
   _updateAllI18nTexts() {
     const setText = (id, text) => {
       const el = document.getElementById(id);
@@ -148,7 +152,7 @@ class BiboApp {
     };
 
     // Header & HUD
-    setText('onlineCountText', i18n.t('app.status.online', { count: '1.482' }));
+    this._updateOnlineCount();
     setText('profileBtn', i18n.t('app.btn.profile'));
     setText('topicChipText', this.activeTopic.toUpperCase());
     setPlaceholder('topicSearchInput', i18n.t('onboarding.ph.topic'));
@@ -225,15 +229,6 @@ class BiboApp {
     setText('toggleThemeBtn', this.profile.theme === 'dark_slate' ? i18n.t('profile.theme.dark') : i18n.t('profile.theme.warm'));
     setText('toggleLangBtn', (i18n.currentLocale || i18n.locale) === 'en' ? 'ENGLISH' : 'ITALIANO');
     
-    // Animation Live Test Bar in Profile
-    setText('lblAnimTestTitle', i18n.t('profile.test_anims_title'));
-    document.querySelectorAll('[data-preview-anim]').forEach(btn => {
-      const animKey = btn.getAttribute('data-preview-anim');
-      if (animKey) {
-        btn.textContent = i18n.t(`anim.preview.${animKey}`);
-      }
-    });
-
     this._updateProfileModalUI();
 
     // Onboarding Modal
@@ -355,6 +350,14 @@ class BiboApp {
     // Give earned resources to pantry
     if (summary.resourcesEarned > 0) {
       this.pet.pantry.biscuit += summary.resourcesEarned;
+      if (minsStudied >= 20) {
+        this.pet.pantry.coffee += Math.max(1, Math.floor(summary.resourcesEarned / 2));
+      }
+      if (minsStudied >= 40) {
+        this.pet.pantry.sponge += 1;
+      }
+      this.pet._savePantry();
+      this.pet._notify(true);
       this._updatePantryButton();
     }
 
@@ -574,13 +577,6 @@ class BiboApp {
       // If Bibo is sleeping, do NOT play annoyed or victory, and do not show their text!
       if (this.pet.state === 'ASLEEP') {
         this._showSpeechBubble(i18n.t('bubble.needs.sleeping_touch'), true);
-        return;
-      }
-
-      // Shift + Click: Instant Victory Celebration Preview
-      if (e.shiftKey) {
-        this.pet.onQuizVictory();
-        this._showSpeechBubble(i18n.t('bubble.victory'));
         return;
       }
 
@@ -1014,118 +1010,6 @@ class BiboApp {
       this._updatePantryButton();
     });
 
-    // 9. Animation Live Preview Buttons (Profile Modal) & Hotkeys 1-9
-    const animMap = {
-      '1': 'idle_base',
-      '2': 'idle_affamato',
-      '3': 'idle_stanco',
-      '4': 'idle_sporco',
-      '5': 'eat_biscuit',
-      '6': 'clean_sponge',
-      '7': 'sleep',
-      '8': 'click_annoyed',
-      '9': 'victory_hop'
-    };
-
-    const triggerPreviewAnim = (animKey) => {
-      audioSynth.playClick();
-
-      // If Bibo is sleeping, block all other animations unless user specifically wakes him with 'idle_base'!
-      if (this.pet.state === 'ASLEEP' && animKey !== 'idle_base' && animKey !== 'sleep') {
-        this._showSpeechBubble(i18n.t('bubble.needs.sleeping_prevent'), true);
-        return;
-      }
-
-      // Clear any pending temporary reaction timeouts
-      if (this.pet.reactionTimeout) {
-        clearTimeout(this.pet.reactionTimeout);
-        this.pet.reactionTimeout = null;
-      }
-
-      switch (animKey) {
-        case 'idle_base':
-          this.pet.state = 'AWAKE';
-          this.pet.hunger = Math.max(80, this.pet.hunger);
-          this.pet.energy = Math.max(80, this.pet.energy);
-          this.pet.cleanliness = Math.max(80, this.pet.cleanliness);
-          this.anim.play(CONFIG.ANIMATIONS.IDLE_BASE, true);
-          this._hideSpeechBubble();
-          this.pet._notify();
-          break;
-
-        case 'idle_affamato':
-          this.pet.state = 'AWAKE';
-          this.pet.hunger = 10;
-          this.anim.play(CONFIG.ANIMATIONS.IDLE_AFFAMATO, true);
-          this._showSpeechBubble(i18n.t('bubble.needs.hungry'), true);
-          this.pet._notify();
-          break;
-
-        case 'idle_stanco':
-          this.pet.state = 'AWAKE';
-          this.pet.energy = 10;
-          this.anim.play(CONFIG.ANIMATIONS.IDLE_STANCO, true);
-          this._showSpeechBubble(i18n.t('bubble.needs.tired'), true);
-          this.pet._notify();
-          break;
-
-        case 'idle_sporco':
-          this.pet.state = 'AWAKE';
-          this.pet.cleanliness = 10;
-          this.anim.play(CONFIG.ANIMATIONS.IDLE_SPORCO, true);
-          this._showSpeechBubble(i18n.t('bubble.needs.dirty'), true);
-          this.pet._notify();
-          break;
-
-        case 'sleep':
-          this.pet.fallAsleep();
-          this._showSpeechBubble(i18n.t('bubble.needs.sleep'), true);
-          break;
-
-        case 'eat_biscuit':
-          this._showSpeechBubble(i18n.t('bubble.feed_biscuit'));
-          this.pet._playTemporaryAnimation(CONFIG.ANIMATIONS.EAT_BISCUIT, 3000);
-          break;
-
-        case 'clean_sponge':
-          this._showSpeechBubble(i18n.t('bubble.clean_sponge'));
-          this.pet._playTemporaryAnimation(CONFIG.ANIMATIONS.CLEAN_SPONGE, 3000);
-          break;
-
-        case 'click_annoyed':
-          const annoyedText = this.pet.onUserClickedDuringStudy() || i18n.t('bubble.annoyed.1');
-          this._showSpeechBubble(annoyedText);
-          break;
-
-        case 'victory_hop':
-          this.pet.onQuizVictory();
-          this._showSpeechBubble(i18n.t('bubble.victory'));
-          break;
-
-        default:
-          this.anim.play(animKey, true);
-          break;
-      }
-    };
-
-    document.querySelectorAll('[data-preview-anim]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const anim = e.currentTarget.getAttribute('data-preview-anim');
-        if (anim) triggerPreviewAnim(anim);
-      });
-    });
-
-    // 10. Global Hotkeys 1-9 to quickly test all 9 animations
-    window.addEventListener('keydown', (e) => {
-      if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
-      if (animMap[e.key]) {
-        triggerPreviewAnim(animMap[e.key]);
-      }
-    });
-
-    // 11. Expose to window for instant dev testing in console
-    window.bibo = this;
-    window.playAnim = (name) => triggerPreviewAnim(name);
   }
 
   _renderTopicSuggestions(query) {

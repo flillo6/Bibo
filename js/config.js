@@ -43,9 +43,9 @@ export const CONFIG = {
    */
   GLOBAL_PROGRESSION: {
     // Milestones for Bibo to evolve across Eras
-    TARGET_EXP_ERA_2: 10000,   // EXP points required to evolve to Mid Bibo (e.g. 10.000 in beta, 50.000 for full launch)
-    TARGET_EXP_ERA_3: 100000,  // EXP points required to evolve to Adult Bibo
-    SEED_BASELINE_EXP: 4280,   // Community baseline seed points (~42.8% of Era 1)
+    TARGET_EXP_ERA_2: 1000,    // EXP points required to evolve to Mid Bibo (achievable milestone for early community)
+    TARGET_EXP_ERA_3: 10000,   // EXP points required to evolve to Adult Bibo
+    SEED_BASELINE_EXP: 0,      // Clean start from 0 EXP (no mock baseline points)
 
     // EXP Rewards for collective study and care actions:
     EXP_STUDY_MINUTE: 1,       // +1 EXP per verified minute studied
@@ -101,7 +101,7 @@ export const CONFIG = {
     MAX_SESSION_MINUTES: 180,
     DEFAULT_DURATION_MINUTES: 25,
     // Real study time required to unlock 1 pantry resource choice (in minutes)
-    MINUTES_PER_RESOURCE: 45
+    MINUTES_PER_RESOURCE: 15
   },
 
   // Color Palettes

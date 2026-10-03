@@ -80,11 +80,13 @@ test('PetManager - Pantry actions: Sponge cleaning restores cleanliness and awar
 test('PetManager - Sleep state machine: biscuit blocked while sleeping, coffee restores energy', () => {
   localStorage.clear();
   const pet = new PetManager();
+  pet.pantry.biscuit = 1;
+  pet.pantry.coffee = 1;
   pet.fallAsleep();
 
   assert.equal(pet.state, 'ASLEEP');
 
-  // Feeding biscuit while sleeping must be gently blocked
+  // Feeding biscuit while sleeping must be gently blocked even with stock
   const feedRes = pet.feedBiscuit();
   assert.equal(feedRes.success, false);
 
@@ -93,4 +95,27 @@ test('PetManager - Sleep state machine: biscuit blocked while sleeping, coffee r
   const coffeeRes = pet.offerCoffee();
   assert.equal(coffeeRes.success, true);
   assert.equal(pet.energy, 85);
+});
+
+test('PetManager - Offline vitals persistence and time-elapsed decay calculation', () => {
+  localStorage.clear();
+  // Simulate previous visit 2 hours ago with 80 hunger, 80 cleanliness, 80 energy
+  const twoHoursAgo = Date.now() - (2 * 60 * 60 * 1000);
+  localStorage.setItem('bibo_v4_release_reset', 'true');
+  localStorage.setItem('bibo_pet_vitals', JSON.stringify({
+    hunger: 80,
+    energy: 80,
+    cleanliness: 80,
+    state: 'AWAKE',
+    lastTimestamp: twoHoursAgo
+  }));
+
+  const pet = new PetManager();
+
+  // 2 hours elapsed = hunger lost: 2 * 8 = 16, energy lost: 2 * 10 = 20, clean lost: 2 * 5 = 10
+  assert.equal(Math.round(pet.hunger), 64);
+  assert.equal(Math.round(pet.energy), 60);
+  assert.equal(Math.round(pet.cleanliness), 70);
+  assert.equal(pet.pantry.biscuit, 0); // Zero start verified
+  assert.equal(pet.globalExp, 0);       // Zero start verified
 });

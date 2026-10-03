@@ -17,7 +17,7 @@
   <link rel="icon" type="image/png" href="assets/icons/icon-192.png">
   <link rel="manifest" href="manifest.json">
 
-  <link rel="stylesheet" href="css/style.css?v=3.1">
+  <link rel="stylesheet" href="css/style.css?v=4.0">
 </head>
 <body>
 
@@ -25,7 +25,7 @@
   <header class="top-hud">
     <div class="hud-left">
       <span class="status-dot">●</span>
-      <span id="onlineCountText">[●] 1.482 ONLINE IN SILENZIO</span>
+      <span id="onlineCountText">[●] 1 ONLINE IN SILENZIO</span>
     </div>
 
     <div class="hud-center">
@@ -345,23 +345,6 @@
           <button id="toggleLangBtn" class="preset-btn" style="margin-left:4px;">ITALIANO</button>
         </div>
       </div>
-
-      <!-- Animation Live Test Bar -->
-      <div style="border-top:1px solid var(--border-color); padding-top:8px; margin-top:8px;">
-        <div id="lblAnimTestTitle" style="font-size:10px; color:var(--text-secondary); margin-bottom:4px; font-weight:700;">PROVA ANIMAZIONI (tasti 1-9):</div>
-        <div style="display:flex; flex-wrap:wrap; gap:4px;" id="animPreviewButtons">
-          <button class="preset-btn" data-preview-anim="idle_base">1 Base</button>
-          <button class="preset-btn" data-preview-anim="idle_affamato">2 Fame</button>
-          <button class="preset-btn" data-preview-anim="idle_stanco">3 Stanco</button>
-          <button class="preset-btn" data-preview-anim="idle_sporco">4 Sporco</button>
-          <button class="preset-btn" data-preview-anim="eat_biscuit">5 Biscotto</button>
-          <button class="preset-btn" data-preview-anim="clean_sponge">6 Spugna</button>
-          <button class="preset-btn" data-preview-anim="sleep">7 Nanna</button>
-          <button class="preset-btn" data-preview-anim="click_annoyed">8 Tocco</button>
-          <button class="preset-btn" data-preview-anim="victory_hop">9 Vittoria</button>
-        </div>
-      </div>
-
     </div>
   </aside>
 
@@ -384,15 +367,37 @@
   </div>
 
   <!-- Main Application Coordinator Entry Point with Cache Buster -->
-  <script type="module" src="js/app.js?v=3.1"></script>
+  <script type="module" src="js/app.js?v=4.0"></script>
 
-  <!-- PWA Service Worker Registration -->
+  <!-- PWA Service Worker Registration with Auto-Update Check -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
-          .then((reg) => console.log('[PWA] Service Worker registered with scope:', reg.scope))
+          .then((reg) => {
+            // Check for updates on every page load
+            reg.update();
+            reg.addEventListener('updatefound', () => {
+              const newWorker = reg.installing;
+              if (newWorker) {
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    console.log('[PWA] New version ready, reloading cleanly...');
+                    window.location.reload();
+                  }
+                });
+              }
+            });
+          })
           .catch((err) => console.warn('[PWA] Service Worker registration skipped:', err));
+
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            refreshing = true;
+            window.location.reload();
+          }
+        });
       });
     }
   </script>

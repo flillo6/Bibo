@@ -18,28 +18,74 @@ export class PetManager {
   constructor(animationPlayer) {
     this.anim = animationPlayer;
 
-    // Biological metrics (0 to 100)
-    this.hunger = CONFIG.NEEDS.HUNGER.initial;
-    this.energy = CONFIG.NEEDS.ENERGY.initial;
-    this.cleanliness = CONFIG.NEEDS.CLEANLINESS.initial;
+    // Clean reset of legacy mock data for release v4
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('bibo_v4_release_reset') !== 'true') {
+      localStorage.removeItem('bibo_global_pantry');
+      localStorage.removeItem('bibo_user_contributed_exp');
+      localStorage.removeItem('bibo_pet_vitals');
+      localStorage.setItem('bibo_v4_release_reset', 'true');
+    }
+
+    // Biological metrics (0 to 100) with offline persistence and elapsed decay
+    let savedVitals = null;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('bibo_pet_vitals');
+        if (raw) savedVitals = JSON.parse(raw);
+      } catch (_) {}
+    }
+
+    if (savedVitals) {
+      this.hunger = typeof savedVitals.hunger === 'number' ? savedVitals.hunger : CONFIG.NEEDS.HUNGER.initial;
+      this.energy = typeof savedVitals.energy === 'number' ? savedVitals.energy : CONFIG.NEEDS.ENERGY.initial;
+      this.cleanliness = typeof savedVitals.cleanliness === 'number' ? savedVitals.cleanliness : CONFIG.NEEDS.CLEANLINESS.initial;
+      this.state = savedVitals.state || 'AWAKE';
+
+      // Apply natural decay for time elapsed while offline / closed
+      if (savedVitals.lastTimestamp) {
+        const elapsedHours = Math.min(48, Math.max(0, (Date.now() - savedVitals.lastTimestamp) / (1000 * 60 * 60)));
+        if (elapsedHours > 0) {
+          this.hunger = Math.max(0, this.hunger - (elapsedHours * CONFIG.NEEDS.HUNGER.decayPerHour));
+          this.cleanliness = Math.max(0, this.cleanliness - (elapsedHours * CONFIG.NEEDS.CLEANLINESS.decayPerHour));
+          if (this.state === 'ASLEEP') {
+            this.energy = Math.min(100, this.energy + (elapsedHours * CONFIG.NEEDS.ENERGY.sleepRegenPerHour));
+            if (this.energy >= CONFIG.NEEDS.ENERGY.wakeThreshold) {
+              this.state = 'AWAKE';
+            }
+          } else {
+            this.energy = Math.max(0, this.energy - (elapsedHours * CONFIG.NEEDS.ENERGY.decayPerHour));
+            if (this.energy <= 5) {
+              this.state = 'ASLEEP';
+            }
+          }
+        }
+      }
+    } else {
+      this.hunger = CONFIG.NEEDS.HUNGER.initial;
+      this.energy = CONFIG.NEEDS.ENERGY.initial;
+      this.cleanliness = CONFIG.NEEDS.CLEANLINESS.initial;
+      this.state = 'AWAKE';
+    }
     
     // Configurable Global Evolution Milestones (from CONFIG.GLOBAL_PROGRESSION)
     this.eraTargetExp = CONFIG.GLOBAL_PROGRESSION.TARGET_EXP_ERA_2;
-    const baseSeedExp = CONFIG.GLOBAL_PROGRESSION.SEED_BASELINE_EXP;
-    this.userContributedExp = parseInt(localStorage.getItem('bibo_user_contributed_exp') || '0', 10);
+    const baseSeedExp = CONFIG.GLOBAL_PROGRESSION.SEED_BASELINE_EXP || 0;
+    this.userContributedExp = parseInt((typeof localStorage !== 'undefined' ? localStorage.getItem('bibo_user_contributed_exp') : '0') || '0', 10);
     this.globalExp = baseSeedExp + this.userContributedExp;
 
-    // Global Pantry stock (persisted)
-    const savedPantry = localStorage.getItem('bibo_global_pantry');
+    // Global Pantry stock (persisted, zero mock start)
+    const savedPantry = typeof localStorage !== 'undefined' ? localStorage.getItem('bibo_global_pantry') : null;
     this.pantry = savedPantry ? JSON.parse(savedPantry) : {
-      biscuit: 142,
-      coffee: 98,
-      sponge: 64
+      biscuit: 0,
+      coffee: 0,
+      sponge: 0
     };
 
     // Biological States: 'AWAKE' | 'ASLEEP'
-    this.state = 'AWAKE';
     this.activeEvolution = 'baby';
+
+    // Persist vitals immediately
+    this._saveVitals();
 
     // Temporary reaction timeout (e.g. annoyed clicks)
     this.reactionTimeout = null;
@@ -99,7 +145,21 @@ export class PetManager {
   }
 
   _savePantry() {
-    localStorage.setItem('bibo_global_pantry', JSON.stringify(this.pantry));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('bibo_global_pantry', JSON.stringify(this.pantry));
+    }
+  }
+
+  _saveVitals() {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('bibo_pet_vitals', JSON.stringify({
+        hunger: Math.round(this.hunger * 10) / 10,
+        energy: Math.round(this.energy * 10) / 10,
+        cleanliness: Math.round(this.cleanliness * 10) / 10,
+        state: this.state,
+        lastTimestamp: Date.now()
+      }));
+    }
   }
 
   _notify(broadcast = true) {
@@ -166,6 +226,7 @@ export class PetManager {
     this.hunger = Math.max(0, this.hunger - (CONFIG.NEEDS.HUNGER.decayPerHour / 60));
     this.cleanliness = Math.max(0, this.cleanliness - (CONFIG.NEEDS.CLEANLINESS.decayPerHour / 60));
 
+    this._saveVitals();
     this._updateAnimationState();
     this._notify();
   }
@@ -185,6 +246,7 @@ export class PetManager {
     if (this.onAnimStateChange) {
       this.onAnimStateChange(CONFIG.ANIMATIONS.SLEEP);
     }
+    this._saveVitals();
     this._notify();
   }
 
@@ -197,6 +259,7 @@ export class PetManager {
       this.reactionTimeout = null;
     }
     this.state = 'AWAKE';
+    this._saveVitals();
     this._updateAnimationState();
     this._notify();
   }
@@ -218,6 +281,7 @@ export class PetManager {
     this.pantry.biscuit--;
     this._savePantry();
     this.hunger = Math.min(100, this.hunger + CONFIG.NEEDS.HUNGER.snackBoost);
+    this._saveVitals();
 
     // Caring for Bibo donates global EXP
     const expGain = CONFIG.GLOBAL_PROGRESSION ? CONFIG.GLOBAL_PROGRESSION.EXP_FEED_BISCUIT : 2;
@@ -244,6 +308,7 @@ export class PetManager {
     this.pantry.coffee--;
     this._savePantry();
     this.energy = Math.min(100, this.energy + CONFIG.NEEDS.ENERGY.coffeeBoost);
+    this._saveVitals();
 
     // Offering coffee donates global EXP
     const expGain = CONFIG.GLOBAL_PROGRESSION ? CONFIG.GLOBAL_PROGRESSION.EXP_OFFER_COFFEE : 2;
@@ -283,6 +348,7 @@ export class PetManager {
     this.pantry.sponge--;
     this._savePantry();
     this.cleanliness = Math.min(100, this.cleanliness + CONFIG.NEEDS.CLEANLINESS.spongeBoost);
+    this._saveVitals();
 
     // Cleaning Bibo donates global EXP
     const expGain = CONFIG.GLOBAL_PROGRESSION ? CONFIG.GLOBAL_PROGRESSION.EXP_CLEAN_SPONGE : 3;

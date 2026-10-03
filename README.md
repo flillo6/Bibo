@@ -4,7 +4,7 @@
 
 [![License: Proprietary](https://img.shields.io/badge/License-All%20Rights%20Reserved-red.svg)](#)
 [![OpEx: 0€](https://img.shields.io/badge/OpEx-0€%2Fmo-success.svg)](#)
-[![Tests: 14 Passed](https://img.shields.io/badge/Tests-14%20Passed-brightgreen.svg)](#)
+[![Tests: 15 Passed](https://img.shields.io/badge/Tests-15%20Passed-brightgreen.svg)](#)
 [![CI/CD: GitHub Actions](https://github.com/flillo6/bibo/actions/workflows/deploy.yml/badge.svg)](https://github.com/flillo6/bibo/actions)
 [![PWA: Offline Ready](https://img.shields.io/badge/PWA-Offline%20Ready-blue.svg)](#)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-orange.svg)](https://flillo6.github.io/bibo/)
@@ -129,7 +129,7 @@ BIBO include una suite di unit test eseguibile con il test runner nativo di Node
 npm test
 ```
 
-### Copertura Completa (14 test in 4 suite — 100% Passing in ~75ms):
+### Copertura Completa (15 test in 4 suite — 100% Passing in ~75ms):
 
 * 📦 **`tests/PetManager.test.js`** (Macchina a stati biologica e dispensa)
   * `ok 1` — Stato biologico iniziale e limiti dei bisogni (Fame, Energia, Pulizia).
@@ -138,17 +138,18 @@ npm test
   * `ok 4` — Azione Caffè: ripristino energia e accredito EXP globale.
   * `ok 5` — Azione Spugna: ripristino pulizia e accredito EXP globale.
   * `ok 6` — Macchina a stati del Sonno: blocco nutrizione e interazioni durante il sonno.
+  * `ok 7` — Persistenza offline dei parametri vitali e calcolo del decadimento per tempo trascorso (*Living Pet*).
 * 📦 **`tests/KnowledgeEngine.test.js`** (Mente collettiva e consenso distribuito)
-  * `ok 7` — Starter pack bilingue verificato (Chimica, Analisi, Fisica, Diritto, Filosofia, Medicina).
-  * `ok 8` — Validazione matematica del Byzantine Fault Tolerance (soglia consenso 67% anti-sybil).
-  * `ok 9` — Approccio 3 Translation Bounty Bridge (traduzione collaborativa peer-to-peer).
-  * `ok 10` — Risoluzione pulita delle liste materie localizzate per evitare serializzazioni anomale.
+  * `ok 8` — Starter pack bilingue verificato (Chimica, Analisi, Fisica, Diritto, Filosofia, Medicina).
+  * `ok 9` — Validazione matematica del Byzantine Fault Tolerance (soglia consenso 67% anti-sybil).
+  * `ok 10` — Approccio 3 Translation Bounty Bridge (traduzione collaborativa peer-to-peer).
+  * `ok 11` — Risoluzione pulita delle liste materie localizzate per evitare serializzazioni anomale.
 * 📦 **`tests/StudyTimer.test.js`** (Timer studio e anti-manomissione)
-  * `ok 11` — Inizializzazione default e vincoli rigidi di durata sessione.
-  * `ok 12` — Algoritmo Anti-Abuso: accredito esclusivo del tempo di studio reale ed effettivo.
+  * `ok 12` — Inizializzazione default e vincoli rigidi di durata sessione.
+  * `ok 13` — Algoritmo Anti-Abuso: accredito esclusivo del tempo di studio reale ed effettivo.
 * 📦 **`tests/ProfileStorage.test.js`** (Identità sovrana e Local-First)
-  * `ok 13` — Generazione deterministica della chiave segreta mnemonica a 3 parole (*Sovereign Storage*).
-  * `ok 14` — Ripristino completo del profilo locale tramite frase mnemonica a zero-server.
+  * `ok 14` — Generazione deterministica della chiave segreta mnemonica a 3 parole (*Sovereign Storage*).
+  * `ok 15` — Ripristino completo del profilo locale tramite frase mnemonica a zero-server.
 
 ---
 
@@ -211,7 +212,7 @@ bibo/
 * **Metriche & Risultati:**
   * **0,00 € di costi operativi per sempre** (nessun server a pagamento, nessun database cloud, nessuna API commerciale a consumo).
   * **Avvio istantaneo < 50ms** e footprint di memoria < 30MB su desktop e mobile.
-  * **100% test passati** (14/14 test automatizzati in 75ms su pipeline CI/CD GitHub Actions).
+  * **100% test passati** (15/15 test automatizzati in 75ms su pipeline CI/CD GitHub Actions).
 
 ---
 

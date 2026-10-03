@@ -145,6 +145,7 @@ export class NetworkMesh {
     }
 
     if (changed) {
+      this.pet._savePantry();
       this.pet._updateAnimationState();
       this.pet._notify(false);
       console.log(`[NetworkMesh] Synchronized state with peer [${sourceId}]. EXP: ${this.pet.globalExp}`);

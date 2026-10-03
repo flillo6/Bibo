@@ -7,18 +7,18 @@
  * - Automatic cache cleanup on version updates
  */
 
-const CACHE_NAME = 'bibo-pwa-v3.1';
+const CACHE_NAME = 'bibo-pwa-v4.0';
 
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './css/style.css?v=3.1',
+  './css/style.css?v=4.0',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
   './js/config.js',
   './js/i18n.js',
-  './js/app.js?v=3.1',
+  './js/app.js?v=4.0',
   './js/audio/AudioSynthesizer.js',
   './js/engine/SpriteAnimation.js',
   './js/engine/PetManager.js',
@@ -63,7 +63,8 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch: Stale-While-Revalidate for app assets, fallback to cache offline
+// Fetch: Network-First for navigation (index.html) so updates arrive instantly,
+// Stale-While-Revalidate for static assets
 self.addEventListener('fetch', (event) => {
   // Only handle GET requests
   if (event.request.method !== 'GET') return;
@@ -73,6 +74,23 @@ self.addEventListener('fetch', (event) => {
   // Skip chrome-extension and non-http(s) schemes
   if (!url.protocol.startsWith('http')) return;
 
+  // 1. Navigation requests: Network-First with Cache Fallback (avoids stale cache on deploy)
+  if (event.request.mode === 'navigate' || url.pathname.endsWith('/') || url.pathname.endsWith('index.html')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match('./index.html') || caches.match('./'))
+    );
+    return;
+  }
+
+  // 2. Static assets: Stale-While-Revalidate
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       // Return cached asset immediately if found, then update in background
@@ -86,13 +104,7 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         })
-        .catch(() => {
-          // If offline and request is an HTML navigation, return cached index.html
-          if (event.request.mode === 'navigate') {
-            return caches.match('./index.html');
-          }
-          return cachedResponse;
-        });
+        .catch(() => cachedResponse);
 
       return cachedResponse || fetchPromise;
     })
