@@ -620,6 +620,27 @@ class BiboApp {
   /* ==================== UI BINDINGS ==================== */
 
   _bindUIEvents() {
+    // Robust mobile audio unlock across touch and click events
+    const unlockAudio = () => {
+      audioSynth._initContext();
+      if (audioSynth.ctx) {
+        if (audioSynth.ctx.state === 'suspended') {
+          audioSynth.ctx.resume().catch(() => {});
+        }
+        // Play an inaudible 1-sample buffer to permanently unlock iOS WebAudio pipeline
+        try {
+          const silentBuf = audioSynth.ctx.createBuffer(1, 1, 22050);
+          const src = audioSynth.ctx.createBufferSource();
+          src.buffer = silentBuf;
+          src.connect(audioSynth.ctx.destination);
+          src.start(0);
+        } catch (_) {}
+      }
+    };
+    ['touchstart', 'touchend', 'pointerdown', 'click'].forEach(evt => {
+      document.addEventListener(evt, unlockAudio, { passive: true });
+    });
+
     // 1. Click on Bibo (Speech bubble & touch reactions)
     document.getElementById('biboContainer').addEventListener('click', (e) => {
       audioSynth.playClick();
@@ -761,10 +782,10 @@ class BiboApp {
     });
 
     document.querySelectorAll('[data-audio]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('click', async (e) => {
         audioSynth.playClick();
         const type = e.target.getAttribute('data-audio');
-        audioSynth.setAmbient(type);
+        await audioSynth.setAmbient(type);
         audioPopover.classList.remove('active');
         
         let label = i18n.t('audio.mute');

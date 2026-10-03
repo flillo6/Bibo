@@ -50,3 +50,42 @@ test('NetworkMesh - Triggers onTopicsSync callback on receiving custom topics', 
   assert.ok(syncedTopics, 'onTopicsSync callback should be called');
   assert.deepEqual(syncedTopics, ['Musica', 'Biochimica'], 'Topics list should match payload');
 });
+
+test('NetworkMesh - Collective Memory: Stale offline peer cannot overwrite newer peer feeding', () => {
+  const pet = new PetManager();
+  const now = Date.now();
+  const t0 = now - 7200000; // 2 hours ago
+  pet.lastVitalsTimestamp = t0;
+  pet.hunger = 40;
+
+  const mesh = new NetworkMesh(pet);
+
+  // User B fed Bibo at t1 (10 seconds ago) to hunger 100
+  const t1 = now - 10000;
+  mesh._handleIncomingMessage({
+    type: 'STATE_SYNC',
+    payload: {
+      hunger: 100,
+      energy: 90,
+      cleanliness: 95,
+      state: 'AWAKE',
+      timestamp: t1
+    }
+  }, 'user-b');
+
+  // Pet adopted User B's state
+  assert.ok(pet.hunger > 80, 'Pet hunger should be updated from User B interaction');
+
+  // Now an outdated message from an old client arrives with timestamp t0 - 500
+  mesh._handleIncomingMessage({
+    type: 'STATE_SYNC',
+    payload: {
+      hunger: 20,
+      timestamp: t0 - 500
+    }
+  }, 'outdated-peer');
+
+  // Outdated message must NOT overwrite
+  assert.ok(pet.hunger > 80, 'Stale offline peer must not overwrite fresh state');
+});
+

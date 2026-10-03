@@ -80,16 +80,28 @@ export class NetworkMesh {
       'wss://relay.primal.net'
     ];
 
+    const turnConfig = [
+      {
+        urls: [
+          'turn:openrelay.metered.ca:80',
+          'turn:openrelay.metered.ca:443',
+          'turns:openrelay.metered.ca:443?transport=tcp'
+        ],
+        username: 'openrelayproject',
+        credential: 'openrelayprojectsecret'
+      }
+    ];
+
     await Promise.allSettled([
-      this._initStrategy('torrent', '../vendor/trystero-torrent.js', torrentRelays, rtcConfig),
-      this._initStrategy('nostr', '../vendor/trystero-nostr.js', nostrRelays, rtcConfig)
+      this._initStrategy('torrent', '../vendor/trystero-torrent.js', torrentRelays, rtcConfig, turnConfig),
+      this._initStrategy('nostr', '../vendor/trystero-nostr.js', nostrRelays, rtcConfig, turnConfig)
     ]);
 
     this._startHeartbeat();
     console.log('[NetworkMesh] Multi-signaling & Gossip engine initialized.');
   }
 
-  async _initStrategy(type, modulePath, relays, rtcConfig) {
+  async _initStrategy(type, modulePath, relays, rtcConfig, turnConfig) {
     try {
       const trystero = await import(modulePath);
       if (!trystero || !trystero.joinRoom) return;
@@ -98,7 +110,8 @@ export class NetworkMesh {
         appId: 'bibo-16bit-sovereign-mesh',
         relayUrls: relays,
         relayConfig: { urls: relays },
-        rtcConfig
+        rtcConfig,
+        turnConfig
       };
 
       const room = trystero.joinRoom(config, this.roomId);
@@ -289,14 +302,22 @@ export class NetworkMesh {
       }
     }
 
-    // 3. Vitals & State (Last-Write-Wins with monotonic timestamp)
-    if (payload.timestamp && payload.timestamp > (this.lastVitalsSyncTimestamp || 0)) {
-      if (typeof payload.hunger === 'number') this.pet.hunger = Math.max(0, Math.min(100, payload.hunger));
-      if (typeof payload.energy === 'number') this.pet.energy = Math.max(0, Math.min(100, payload.energy));
-      if (typeof payload.cleanliness === 'number') this.pet.cleanliness = Math.max(0, Math.min(100, payload.cleanliness));
-      if (payload.state) this.pet.state = payload.state;
-      this.lastVitalsSyncTimestamp = payload.timestamp;
-      mutated = true;
+    // 3. Vitals & State (Collective consensus via adoptRemoteState)
+    if (payload.timestamp) {
+      if (typeof this.pet.adoptRemoteState === 'function') {
+        const adopted = this.pet.adoptRemoteState(payload);
+        if (adopted) {
+          this.lastVitalsSyncTimestamp = payload.timestamp;
+          mutated = true;
+        }
+      } else if (payload.timestamp > (this.lastVitalsSyncTimestamp || 0)) {
+        if (typeof payload.hunger === 'number') this.pet.hunger = Math.max(0, Math.min(100, payload.hunger));
+        if (typeof payload.energy === 'number') this.pet.energy = Math.max(0, Math.min(100, payload.energy));
+        if (typeof payload.cleanliness === 'number') this.pet.cleanliness = Math.max(0, Math.min(100, payload.cleanliness));
+        if (payload.state) this.pet.state = payload.state;
+        this.lastVitalsSyncTimestamp = payload.timestamp;
+        mutated = true;
+      }
     }
 
     // 4. Custom topics synchronization

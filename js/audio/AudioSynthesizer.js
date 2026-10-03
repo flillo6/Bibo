@@ -19,22 +19,30 @@ class AudioSynthesizer {
   _initContext() {
     if (!this.ctx) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      this.ctx = new AudioCtx();
+      if (AudioCtx) {
+        this.ctx = new AudioCtx();
+      }
     }
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
     }
   }
 
   /**
    * Set ambient background noise: 'mute', 'rain', or 'brown'
    */
-  setAmbient(type) {
+  async setAmbient(type) {
     this._initContext();
+    if (this.ctx && this.ctx.state === 'suspended') {
+      try {
+        await this.ctx.resume();
+      } catch (_) {}
+    }
+
     this.stopAmbient();
     this.currentAmbient = type;
 
-    if (type === 'mute' || this.isMuted) return;
+    if (type === 'mute' || this.isMuted || !this.ctx) return;
 
     if (type === 'brown') {
       this._startBrownNoise();

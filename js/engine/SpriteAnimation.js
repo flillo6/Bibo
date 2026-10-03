@@ -241,14 +241,17 @@ export class SpriteAnimationPlayer {
     const shadowRadiusX = targetWidth * (meta.shadowScaleX || 0.33);
     const shadowRadiusY = meta.shadowScaleY || 9;
 
+    // 1. Draw sprite frame first
+    this.ctx.drawImage(img, sx, sy, fw, fh, dx, dy, targetWidth, targetHeight);
+
+    // 2. Crisp grounding ellipse shadow placed under sneakers on canvas floor
+    // Using source-over or destination-over
     this.ctx.save();
+    this.ctx.globalCompositeOperation = 'destination-over'; // Draw shadow UNDER sprite without ever being clipped or covered
     this.ctx.beginPath();
     this.ctx.ellipse(shadowX, shadowY, shadowRadiusX, shadowRadiusY, 0, 0, Math.PI * 2);
-    this.ctx.fillStyle = 'rgba(46, 52, 64, 0.28)'; // Crisp grounding shadow
+    this.ctx.fillStyle = 'rgba(46, 52, 64, 0.32)'; // Crisp grounding shadow
     this.ctx.fill();
     this.ctx.restore();
-
-    // 2. Draw sprite frame
-    this.ctx.drawImage(img, sx, sy, fw, fh, dx, dy, targetWidth, targetHeight);
   }
 }

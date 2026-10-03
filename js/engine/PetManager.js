@@ -40,6 +40,7 @@ export class PetManager {
       this.energy = typeof savedVitals.energy === 'number' ? savedVitals.energy : CONFIG.NEEDS.ENERGY.initial;
       this.cleanliness = typeof savedVitals.cleanliness === 'number' ? savedVitals.cleanliness : CONFIG.NEEDS.CLEANLINESS.initial;
       this.state = savedVitals.state || 'AWAKE';
+      this.lastVitalsTimestamp = typeof savedVitals.lastTimestamp === 'number' ? savedVitals.lastTimestamp : Date.now();
 
       // Apply natural decay for time elapsed while offline / closed
       if (savedVitals.lastTimestamp) {
@@ -50,6 +51,7 @@ export class PetManager {
       this.energy = CONFIG.NEEDS.ENERGY.initial;
       this.cleanliness = CONFIG.NEEDS.CLEANLINESS.initial;
       this.state = 'AWAKE';
+      this.lastVitalsTimestamp = Date.now();
     }
     
     // Configurable Global Evolution Milestones (from CONFIG.GLOBAL_PROGRESSION)
@@ -151,15 +153,52 @@ export class PetManager {
   }
 
   _saveVitals() {
+    this.lastVitalsTimestamp = Date.now();
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('bibo_pet_vitals', JSON.stringify({
         hunger: Math.round(this.hunger * 10) / 10,
         energy: Math.round(this.energy * 10) / 10,
         cleanliness: Math.round(this.cleanliness * 10) / 10,
         state: this.state,
-        lastTimestamp: Date.now()
+        lastTimestamp: this.lastVitalsTimestamp
       }));
     }
+  }
+
+  /**
+   * Adopts remote collective state if it is fresher than our local timestamp.
+   * If remote is newer, applies natural decay ONLY from remote.timestamp to now.
+   */
+  adoptRemoteState(remote) {
+    if (!remote || typeof remote !== 'object') return false;
+    const remoteTs = typeof remote.timestamp === 'number' ? remote.timestamp : 0;
+    if (remoteTs < (this.lastVitalsTimestamp || 0)) {
+      return false; // Local is strictly fresher
+    }
+
+    // Remote is fresher: accept remote values as authoritative base
+    if (typeof remote.hunger === 'number') this.hunger = Math.max(0, Math.min(100, remote.hunger));
+    if (typeof remote.energy === 'number') this.energy = Math.max(0, Math.min(100, remote.energy));
+    if (typeof remote.cleanliness === 'number') this.cleanliness = Math.max(0, Math.min(100, remote.cleanliness));
+    if (remote.state) this.state = remote.state;
+
+    // Apply natural decay only for time elapsed since the peer's interaction
+    this._applyElapsedDecay(remoteTs);
+    this.lastVitalsTimestamp = Date.now();
+
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('bibo_pet_vitals', JSON.stringify({
+        hunger: Math.round(this.hunger * 10) / 10,
+        energy: Math.round(this.energy * 10) / 10,
+        cleanliness: Math.round(this.cleanliness * 10) / 10,
+        state: this.state,
+        lastTimestamp: this.lastVitalsTimestamp
+      }));
+    }
+
+    this._updateAnimationState();
+    this._notify(false);
+    return true;
   }
 
   _notify(broadcast = true) {
