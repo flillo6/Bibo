@@ -20,3 +20,10 @@ ehthumbs.db
 # Build outputs
 dist/
 build/
+
+# Internal docs and design drafts (local only)
+BIBO_FULL_CODEBASE_AUDIT.md
+DOCS_ANIMATIONS.md
+pixellab_char.png
+*.pdf
+_local_docs/

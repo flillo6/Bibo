@@ -93,36 +93,75 @@ export class NetworkMesh {
 
   async _initNostrBus(relays) {
     if (typeof WebSocket === 'undefined') return;
+    this.nostrRelayUrls = relays;
     try {
       const { createEvent } = await import('../vendor/trystero-nostr.js');
       this.nostrCreateEvent = createEvent;
 
       for (const url of relays) {
-        try {
-          const ws = new WebSocket(url);
-          ws.onopen = () => {
-            console.log(`[NetworkMesh] Nostr Sovereign Bus connected: ${url}`);
-            ws.send(JSON.stringify(['REQ', 'sub_bibo_bus', {
-              kinds: [this.nostrKind],
-              '#x': [this.nostrTopic]
-            }]));
-            this.broadcastState();
-          };
-          ws.onmessage = (e) => {
-            try {
-              const [verb, sub, ev] = JSON.parse(e.data);
-              if (verb === 'EVENT' && ev && ev.content) {
-                const packet = JSON.parse(ev.content);
-                this._handleGossipPacket(packet, ev.pubkey);
-              }
-            } catch (_) {}
-          };
-          ws.onerror = () => {};
-          this.nostrSockets.push(ws);
-        } catch (_) {}
+        this._connectNostrRelay(url);
+      }
+
+      // Mobile PWA Lifecycle: Instant reconnect on foreground / unlock
+      if (typeof window !== 'undefined') {
+        const handleWake = () => {
+          this._reconnectDeadSockets();
+          this.broadcastState();
+          this._emitGossip('REQUEST_SYNC', { senderId: this.localPeerId });
+        };
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') handleWake();
+        });
+        window.addEventListener('focus', handleWake);
+        window.addEventListener('pageshow', handleWake);
+        window.addEventListener('online', handleWake);
       }
     } catch (err) {
       console.warn('[NetworkMesh] Nostr bus initialization skipped:', err?.message);
+    }
+  }
+
+  _connectNostrRelay(url) {
+    if (typeof WebSocket === 'undefined') return;
+    try {
+      const ws = new WebSocket(url);
+      ws._url = url;
+      ws.onopen = () => {
+        console.log(`[NetworkMesh] Nostr Sovereign Bus connected: ${url}`);
+        ws.send(JSON.stringify(['REQ', 'sub_bibo_bus', {
+          kinds: [this.nostrKind],
+          '#x': [this.nostrTopic]
+        }]));
+        this.broadcastState();
+      };
+      ws.onmessage = (e) => {
+        try {
+          const [verb, sub, ev] = JSON.parse(e.data);
+          if (verb === 'EVENT' && ev && ev.content) {
+            const packet = JSON.parse(ev.content);
+            this._handleGossipPacket(packet, ev.pubkey);
+          }
+        } catch (_) {}
+      };
+      ws.onclose = () => {
+        const idx = this.nostrSockets.indexOf(ws);
+        if (idx !== -1) this.nostrSockets.splice(idx, 1);
+        if (!this._isDestroyed) {
+          setTimeout(() => this._connectNostrRelay(url), 3000 + Math.random() * 2000);
+        }
+      };
+      ws.onerror = () => {};
+      this.nostrSockets.push(ws);
+    } catch (_) {}
+  }
+
+  _reconnectDeadSockets() {
+    if (!this.nostrRelayUrls) return;
+    const activeUrls = new Set(this.nostrSockets.filter(s => s.readyState === 1 || s.readyState === 0).map(s => s._url));
+    for (const url of this.nostrRelayUrls) {
+      if (!activeUrls.has(url)) {
+        this._connectNostrRelay(url);
+      }
     }
   }
 
