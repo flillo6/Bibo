@@ -11,15 +11,15 @@
  * - Decentralized KnowledgeEngine & Peer-Review flow
  */
 
-import { CONFIG } from './config.js?v=2.9';
-import { i18n } from './i18n.js?v=2.9';
-import { audioSynth } from './audio/AudioSynthesizer.js?v=2.9';
-import { SpriteAnimationPlayer } from './engine/SpriteAnimation.js?v=2.9';
-import { PetManager } from './engine/PetManager.js?v=2.9';
-import { StudyTimer } from './engine/StudyTimer.js?v=2.9';
-import { KnowledgeEngine } from './knowledge/KnowledgeEngine.js?v=2.9';
-import { profileStorage } from './storage/profileStorage.js?v=2.9';
-import { NetworkMesh } from './network/NetworkMesh.js?v=3.1';
+import { CONFIG } from './config.js';
+import { i18n } from './i18n.js';
+import { audioSynth } from './audio/AudioSynthesizer.js';
+import { SpriteAnimationPlayer } from './engine/SpriteAnimation.js';
+import { PetManager } from './engine/PetManager.js';
+import { StudyTimer } from './engine/StudyTimer.js';
+import { KnowledgeEngine } from './knowledge/KnowledgeEngine.js';
+import { profileStorage } from './storage/ProfileStorage.js';
+import { NetworkMesh } from './network/NetworkMesh.js';
 
 class BiboApp {
   constructor() {

@@ -10,7 +10,7 @@
  *   it gracefully falls back to 'idle_base' without visual disruption.
  */
 
-import { CONFIG } from '../config.js?v=2.9';
+import { CONFIG } from '../config.js';
 
 export class SpriteAnimationPlayer {
   constructor(canvas) {

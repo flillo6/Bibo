@@ -10,9 +10,9 @@
  * Future companions can be registered seamlessly without rewriting core logic.
  */
 
-import { CONFIG } from '../config.js?v=2.9';
-import { i18n } from '../i18n.js?v=2.9';
-import { profileStorage } from '../storage/profileStorage.js?v=2.9';
+import { CONFIG } from '../config.js';
+import { i18n } from '../i18n.js';
+import { profileStorage } from '../storage/ProfileStorage.js';
 
 export class PetManager {
   constructor(animationPlayer) {
