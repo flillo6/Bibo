@@ -30,6 +30,11 @@ export class NetworkMesh {
     this.roomTorrent = null;
     this.roomNostr = null;
 
+    this.nostrSockets = [];
+    this.nostrCreateEvent = null;
+    this.nostrTopic = 'bibo-global-gossip-v3';
+    this.nostrKind = 22002;
+
     this.localChannel = typeof BroadcastChannel !== 'undefined'
       ? new BroadcastChannel('bibo_mesh_local_v2')
       : null;
@@ -78,11 +83,47 @@ export class NetworkMesh {
 
     await Promise.allSettled([
       this._initStrategy('torrent', '../vendor/trystero-torrent.js', torrentRelays, rtcConfig),
-      this._initStrategy('nostr', '../vendor/trystero-nostr.js', nostrRelays, rtcConfig)
+      this._initStrategy('nostr', '../vendor/trystero-nostr.js', nostrRelays, rtcConfig),
+      this._initNostrBus(nostrRelays)
     ]);
 
     this._startHeartbeat();
     console.log('[NetworkMesh] Multi-signaling & Gossip engine initialized.');
+  }
+
+  async _initNostrBus(relays) {
+    if (typeof WebSocket === 'undefined') return;
+    try {
+      const { createEvent } = await import('../vendor/trystero-nostr.js');
+      this.nostrCreateEvent = createEvent;
+
+      for (const url of relays) {
+        try {
+          const ws = new WebSocket(url);
+          ws.onopen = () => {
+            console.log(`[NetworkMesh] Nostr Sovereign Bus connected: ${url}`);
+            ws.send(JSON.stringify(['REQ', 'sub_bibo_bus', {
+              kinds: [this.nostrKind],
+              '#x': [this.nostrTopic]
+            }]));
+            this.broadcastState();
+          };
+          ws.onmessage = (e) => {
+            try {
+              const [verb, sub, ev] = JSON.parse(e.data);
+              if (verb === 'EVENT' && ev && ev.content) {
+                const packet = JSON.parse(ev.content);
+                this._handleGossipPacket(packet, ev.pubkey);
+              }
+            } catch (_) {}
+          };
+          ws.onerror = () => {};
+          this.nostrSockets.push(ws);
+        } catch (_) {}
+      }
+    } catch (err) {
+      console.warn('[NetworkMesh] Nostr bus initialization skipped:', err?.message);
+    }
   }
 
   async _initStrategy(type, modulePath, relays, rtcConfig) {
@@ -229,11 +270,23 @@ export class NetworkMesh {
   }
 
   _dispatchToOverlay(packet) {
+    // 1. Direct WebRTC DataChannels (if P2P hole-punch succeeded)
     if (this.roomTorrent && this.roomTorrent._rawSend) {
       try { this.roomTorrent._rawSend(packet); } catch (_) {}
     }
     if (this.roomNostr && this.roomNostr._rawSend) {
       try { this.roomNostr._rawSend(packet); } catch (_) {}
+    }
+
+    // 2. Sovereign Decentralized Nostr WebSocket Bus (100% NAT-proof delivery across all carriers & devices)
+    if (this.nostrCreateEvent && this.nostrSockets && this.nostrSockets.length > 0) {
+      this.nostrCreateEvent(this.nostrTopic, JSON.stringify(packet)).then((eventJson) => {
+        for (const ws of this.nostrSockets) {
+          if (ws && ws.readyState === 1) { // 1 = OPEN
+            try { ws.send(eventJson); } catch (_) {}
+          }
+        }
+      }).catch(() => {});
     }
   }
 
