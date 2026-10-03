@@ -8,18 +8,18 @@
  * - Native iOS & Android PWA live revalidation
  */
 
-const CACHE_NAME = 'bibo-pwa-v5.2';
+const CACHE_NAME = 'bibo-pwa-v5.3';
 
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './css/style.css?v=5.2',
+  './css/style.css?v=5.3',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
   './js/config.js',
   './js/i18n.js',
-  './js/app.js?v=5.2',
+  './js/app.js?v=5.3',
   './js/audio/AudioSynthesizer.js',
   './js/engine/SpriteAnimation.js',
   './js/engine/PetManager.js',
@@ -45,7 +45,7 @@ const STATIC_ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[ServiceWorker] Pre-caching offline assets for v5.2...');
+      console.log('[ServiceWorker] Pre-caching offline assets for v5.3...');
       return cache.addAll(STATIC_ASSETS);
     }).then(() => self.skipWaiting())
   );

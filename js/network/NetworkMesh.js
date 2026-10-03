@@ -90,41 +90,60 @@ export class NetworkMesh {
 
         this.room = trysteroModule.joinRoom(config, this.roomId);
 
-        // Actions
-        const [sendSync, getSync] = this.room.makeAction('sync');
-        const [sendNotion, getNotion] = this.room.makeAction('notion');
+        // Actions: Support both v0.25 ({send, onMessage}) and legacy ([send, get])
+        const syncAction = this.room.makeAction('sync');
+        if (Array.isArray(syncAction)) {
+          this._sendSync = syncAction[0];
+          syncAction[1]((data, peerId) => this._handleIncomingMessage(data, peerId));
+        } else if (syncAction && typeof syncAction.send === 'function') {
+          this._sendSync = (data) => syncAction.send(data);
+          syncAction.onMessage = (data, meta) => {
+            const peerId = (meta && meta.peerId) ? meta.peerId : 'remote';
+            this._handleIncomingMessage(data, peerId);
+          };
+        }
 
-        this._sendSync = sendSync;
-        this._sendNotion = sendNotion;
+        const notionAction = this.room.makeAction('notion');
+        if (Array.isArray(notionAction)) {
+          this._sendNotion = notionAction[0];
+          notionAction[1]((data, peerId) => {
+            if (this.onNotionSync) this.onNotionSync(data, peerId);
+          });
+        } else if (notionAction && typeof notionAction.send === 'function') {
+          this._sendNotion = (data) => notionAction.send(data);
+          notionAction.onMessage = (data, meta) => {
+            const peerId = (meta && meta.peerId) ? meta.peerId : 'remote';
+            if (this.onNotionSync) this.onNotionSync(data, peerId);
+          };
+        }
 
-        // Peer join/leave listeners
-        this.room.onPeerJoin((peerId) => {
+        // Peer join/leave listeners: Support both setter (v0.25) and method call (v0.18)
+        const onJoinHandler = (peerId) => {
           this.peers.add(peerId);
           this.peerCount = this.peers.size + 1; // +1 for self
           if (this.onPeerCountChange) this.onPeerCountChange(this.peerCount);
-
-          // Greet new peer with our current state snapshot & known topics
           this.broadcastState();
           console.log(`[NetworkMesh] P2P Peer connected: ${peerId}. Mesh count: ${this.peerCount}`);
-        });
+        };
 
-        this.room.onPeerLeave((peerId) => {
+        const onLeaveHandler = (peerId) => {
           this.peers.delete(peerId);
           this.peerCount = this.peers.size + 1;
           if (this.onPeerCountChange) this.onPeerCountChange(this.peerCount);
           console.log(`[NetworkMesh] P2P Peer disconnected: ${peerId}. Mesh count: ${this.peerCount}`);
-        });
+        };
 
-        // Incoming remote actions
-        getSync((data, peerId) => {
-          this._handleIncomingMessage(data, peerId);
-        });
+        try {
+          this.room.onPeerJoin = onJoinHandler;
+        } catch (_) {
+          if (typeof this.room.onPeerJoin === 'function') this.room.onPeerJoin(onJoinHandler);
+        }
 
-        getNotion((data, peerId) => {
-          if (this.onNotionSync) {
-            this.onNotionSync(data, peerId);
-          }
-        });
+        try {
+          this.room.onPeerLeave = onLeaveHandler;
+        } catch (_) {
+          if (typeof this.room.onPeerLeave === 'function') this.room.onPeerLeave(onLeaveHandler);
+        }
 
         console.log(`[NetworkMesh] P2P WebRTC mesh online via ${usedConnector.toUpperCase()}. Self ID: ${trysteroModule.selfId || 'local'}`);
       } else {
