@@ -1,168 +1,251 @@
 /**
- * BIBO - NetworkMesh (Zero-Cost Decentralized P2P Synchronization)
- * 
- * Architecture:
- * - Pure client-side WebRTC DataChannels with WebTorrent tracker & Nostr relay discovery.
- * - Zero OpEx (€0.00 / month forever): no central server, no Redis, no WebSocket bills.
- * - Conflict-Free Replicated Data Type (CRDT) state reconciliation:
- *   - Global EXP: monotonic max accumulation.
- *   - Pantry stock: deterministic delta resolution.
- *   - Collective biological vitals (hunger, energy, cleanliness, sleep state).
- *   - Sovereign peer-to-peer knowledge & topics mesh.
- * - Bridges PetManager and KnowledgeEngine events across devices in real time.
+ * js/network/NetworkMesh.js
+ * Sovereign Zero-OpEx P2P Engine: Hybrid Signaling, Fallback TURN, Gossip Overlay & CRDT
  */
 
 export class NetworkMesh {
-  constructor(petManager, roomId = 'bibo-global-collective-v1') {
+  constructor(petManager, roomId = 'bibo-global-collective-v2') {
     this.pet = petManager;
     this.roomId = roomId;
-    this.peers = new Set();
-    this.peerCount = 1; // Start with 1 (self is online)
+
+    this.localPeerId = this._generatePeerId();
+    this.activePeers = new Map(); // peerId -> { source, lastSeen }
+    this.seenMessages = new Set();
+    this.messageHistory = [];
+    this.maxSeenCache = 1000;
+
+    this.peerCount = 1;
+    this.maxDegree = 8;
+    this.heartbeatIntervalMs = 10000;
+    this.heartbeatTimer = null;
+    this.lastVitalsSyncTimestamp = 0;
+
     this.onPeerCountChange = null;
     this.onTopicsSync = null;
     this.onNotionSync = null;
     this.getCustomTopics = null;
-    this.isInitialized = false;
-    this.lastVitalsSyncTimestamp = 0;
 
-    // Local-First BroadcastChannel fallback (always available for tabs on the same profile)
+    this.roomTorrent = null;
+    this.roomNostr = null;
+
     this.localChannel = typeof BroadcastChannel !== 'undefined'
-      ? new BroadcastChannel('bibo_mesh_local_v1')
+      ? new BroadcastChannel('bibo_mesh_local_v2')
       : null;
 
     if (this.localChannel) {
-      this.localChannel.onmessage = (e) => {
-        if (!e.data) return;
-        if (e.data.type === 'BIBO_P2P_SYNC') {
-          this._handleIncomingMessage(e.data, 'local');
-        } else if (e.data.type === 'BIBO_P2P_NOTION') {
-          if (this.onNotionSync) {
-            this.onNotionSync(e.data.payload, 'local');
-          }
+      this.localChannel.onmessage = (e) => this._handleLocalBroadcast(e);
+    }
+  }
+
+  _generatePeerId() {
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      const raw = crypto.getRandomValues(new Uint8Array(8));
+      return 'bibo_' + Array.from(raw, b => b.toString(16).padStart(2, '0')).join('');
+    }
+    return 'bibo_' + Math.random().toString(36).slice(2, 10);
+  }
+
+  async init() {
+    console.log(`[NetworkMesh] Starting Sovereign P2P Stack. Self ID: ${this.localPeerId}`);
+
+    const rtcConfig = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun.cloudflare.com:3478' },
+        { urls: 'stun:openrelay.metered.ca:80' },
+        {
+          urls: [
+            'turn:openrelay.metered.ca:80',
+            'turn:openrelay.metered.ca:443',
+            'turns:openrelay.metered.ca:443?transport=tcp'
+          ],
+          username: 'openrelayproject',
+          credential: 'openrelayprojectsecret'
+        }
+      ],
+      iceCandidatePoolSize: 4
+    };
+
+    const torrentRelays = [
+      'wss://tracker.openwebtorrent.com',
+      'wss://tracker.webtorrent.dev',
+      'wss://tracker.files.fm:7073/announce'
+    ];
+
+    const nostrRelays = [
+      'wss://relay.damus.io',
+      'wss://nos.lol',
+      'wss://nostr.mom',
+      'wss://relay.snort.social'
+    ];
+
+    await Promise.allSettled([
+      this._initStrategy('torrent', '../vendor/trystero-torrent.js', torrentRelays, rtcConfig),
+      this._initStrategy('nostr', '../vendor/trystero-nostr.js', nostrRelays, rtcConfig)
+    ]);
+
+    this._startHeartbeat();
+    console.log('[NetworkMesh] Multi-signaling & Gossip engine initialized.');
+  }
+
+  async _initStrategy(type, modulePath, relays, rtcConfig) {
+    try {
+      const trystero = await import(modulePath);
+      if (!trystero || !trystero.joinRoom) return;
+
+      const config = {
+        appId: 'bibo-16bit-sovereign-mesh',
+        relayUrls: relays,
+        relayConfig: { urls: relays },
+        rtcConfig
+      };
+
+      const room = trystero.joinRoom(config, this.roomId);
+      if (type === 'torrent') this.roomTorrent = room;
+      if (type === 'nostr') this.roomNostr = room;
+
+      const gossipAction = room.makeAction('gossip');
+      let sendGossip;
+
+      if (Array.isArray(gossipAction)) {
+        sendGossip = gossipAction[0];
+        gossipAction[1]((data, senderId) => this._handleGossipPacket(data, senderId));
+      } else if (gossipAction && typeof gossipAction.send === 'function') {
+        sendGossip = (data) => gossipAction.send(data);
+        gossipAction.onMessage = (data, meta) => {
+          const senderId = (typeof meta === 'string') ? meta : (meta?.peerId || meta?.sender || 'peer');
+          this._handleGossipPacket(data, senderId);
+        };
+      }
+
+      room._rawSend = sendGossip;
+
+      const handleJoin = (peerId) => {
+        if (this.activePeers.size >= this.maxDegree) {
+          return;
+        }
+        this.activePeers.set(peerId, { source: type, lastSeen: Date.now() });
+        this._updatePeerMetrics();
+        this.broadcastState();
+      };
+
+      const handleLeave = (peerId) => {
+        if (this.activePeers.has(peerId)) {
+          this.activePeers.delete(peerId);
+          this._updatePeerMetrics();
         }
       };
-    }
-  }
 
-  /**
-   * Initializes P2P WebRTC discovery mesh via local bundled WebTorrent or Nostr connectors
-   */
-  async init() {
-    if (this.isInitialized) return;
-    this.isInitialized = true;
+      if (typeof room.onPeerJoin === 'function') room.onPeerJoin(handleJoin);
+      else room.onPeerJoin = handleJoin;
 
-    try {
-      let trysteroModule = null;
-      let usedConnector = 'torrent';
+      if (typeof room.onPeerLeave === 'function') room.onPeerLeave(handleLeave);
+      else room.onPeerLeave = handleLeave;
 
-      // 1. Try local vendored WebTorrent bundle
-      try {
-        trysteroModule = await import('../vendor/trystero-torrent.js');
-      } catch (errTorrent) {
-        console.warn('[NetworkMesh] Torrent bundle load failed, trying Nostr bundle:', errTorrent);
-        try {
-          trysteroModule = await import('../vendor/trystero-nostr.js');
-          usedConnector = 'nostr';
-        } catch (errNostr) {
-          console.warn('[NetworkMesh] Nostr bundle load failed:', errNostr);
-        }
-      }
-
-      if (trysteroModule && trysteroModule.joinRoom) {
-        const config = {
-          appId: 'bibo-16bit-global-study',
-          relayUrls: usedConnector === 'torrent'
-            ? ['wss://tracker.openwebtorrent.com', 'wss://tracker.webtorrent.dev']
-            : ['wss://relay.damus.io', 'wss://nos.lol', 'wss://nostr.mom'],
-          relayConfig: {
-            urls: usedConnector === 'torrent'
-              ? ['wss://tracker.openwebtorrent.com', 'wss://tracker.webtorrent.dev']
-              : ['wss://relay.damus.io', 'wss://nos.lol', 'wss://nostr.mom']
-          },
-          rtcConfig: {
-            iceServers: [
-              { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:stun1.l.google.com:19302' },
-              { urls: 'stun:stun.cloudflare.com:3478' }
-            ]
-          }
-        };
-
-        this.room = trysteroModule.joinRoom(config, this.roomId);
-
-        // Actions: Support both v0.25 ({send, onMessage}) and legacy ([send, get])
-        const syncAction = this.room.makeAction('sync');
-        if (Array.isArray(syncAction)) {
-          this._sendSync = syncAction[0];
-          syncAction[1]((data, peerId) => this._handleIncomingMessage(data, peerId));
-        } else if (syncAction && typeof syncAction.send === 'function') {
-          this._sendSync = (data) => syncAction.send(data);
-          syncAction.onMessage = (data, meta) => {
-            const peerId = (meta && meta.peerId) ? meta.peerId : 'remote';
-            this._handleIncomingMessage(data, peerId);
-          };
-        }
-
-        const notionAction = this.room.makeAction('notion');
-        if (Array.isArray(notionAction)) {
-          this._sendNotion = notionAction[0];
-          notionAction[1]((data, peerId) => {
-            if (this.onNotionSync) this.onNotionSync(data, peerId);
-          });
-        } else if (notionAction && typeof notionAction.send === 'function') {
-          this._sendNotion = (data) => notionAction.send(data);
-          notionAction.onMessage = (data, meta) => {
-            const peerId = (meta && meta.peerId) ? meta.peerId : 'remote';
-            if (this.onNotionSync) this.onNotionSync(data, peerId);
-          };
-        }
-
-        // Peer join/leave listeners: Support both setter (v0.25) and method call (v0.18)
-        const onJoinHandler = (peerId) => {
-          this.peers.add(peerId);
-          this.peerCount = this.peers.size + 1; // +1 for self
-          if (this.onPeerCountChange) this.onPeerCountChange(this.peerCount);
-          this.broadcastState();
-          console.log(`[NetworkMesh] P2P Peer connected: ${peerId}. Mesh count: ${this.peerCount}`);
-        };
-
-        const onLeaveHandler = (peerId) => {
-          this.peers.delete(peerId);
-          this.peerCount = this.peers.size + 1;
-          if (this.onPeerCountChange) this.onPeerCountChange(this.peerCount);
-          console.log(`[NetworkMesh] P2P Peer disconnected: ${peerId}. Mesh count: ${this.peerCount}`);
-        };
-
-        try {
-          this.room.onPeerJoin = onJoinHandler;
-        } catch (_) {
-          if (typeof this.room.onPeerJoin === 'function') this.room.onPeerJoin(onJoinHandler);
-        }
-
-        try {
-          this.room.onPeerLeave = onLeaveHandler;
-        } catch (_) {
-          if (typeof this.room.onPeerLeave === 'function') this.room.onPeerLeave(onLeaveHandler);
-        }
-
-        console.log(`[NetworkMesh] P2P WebRTC mesh online via ${usedConnector.toUpperCase()}. Self ID: ${trysteroModule.selfId || 'local'}`);
-      } else {
-        console.log('[NetworkMesh] Running in sovereign Local-First mode (BroadcastChannel).');
-      }
     } catch (err) {
-      console.warn('[NetworkMesh] P2P initialization note:', err.message);
+      console.warn(`[NetworkMesh] Strategy ${type} initialization skipped:`, err.message);
+    }
+  }
+
+  _startHeartbeat() {
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = setInterval(() => {
+      const now = Date.now();
+      for (const [peerId, meta] of this.activePeers.entries()) {
+        if (now - meta.lastSeen > 35000) {
+          this.activePeers.delete(peerId);
+        }
+      }
+      this._updatePeerMetrics();
+
+      this._emitGossip('HEARTBEAT', { sender: this.localPeerId, timestamp: now });
+    }, this.heartbeatIntervalMs);
+  }
+
+  _updatePeerMetrics() {
+    this.peerCount = this.activePeers.size + 1;
+    if (this.onPeerCountChange) {
+      this.onPeerCountChange(this.peerCount);
+    }
+  }
+
+  _emitGossip(type, payload) {
+    const messageId = `${this.localPeerId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const packet = { id: messageId, type, payload, ttl: 4 };
+
+    this._markAsSeen(messageId);
+    this._dispatchToOverlay(packet);
+
+    if (this.localChannel) {
+      this.localChannel.postMessage({ type: 'BIBO_LOCAL_RELAY', packet });
+    }
+  }
+
+  _dispatchToOverlay(packet) {
+    if (this.roomTorrent && this.roomTorrent._rawSend) {
+      try { this.roomTorrent._rawSend(packet); } catch (_) {}
+    }
+    if (this.roomNostr && this.roomNostr._rawSend) {
+      try { this.roomNostr._rawSend(packet); } catch (_) {}
+    }
+  }
+
+  _handleGossipPacket(packet, senderId) {
+    if (!packet || !packet.id || this.seenMessages.has(packet.id)) return;
+    this._markAsSeen(packet.id);
+
+    if (this.activePeers.has(senderId)) {
+      this.activePeers.get(senderId).lastSeen = Date.now();
+    }
+
+    switch (packet.type) {
+      case 'HEARTBEAT':
+        break;
+      case 'STATE_SYNC':
+      case 'BIBO_P2P_SYNC':
+        this._mergeCRDTState(packet.payload, senderId);
+        break;
+      case 'NOTION_BROADCAST':
+      case 'BIBO_P2P_NOTION':
+        if (this.onNotionSync) this.onNotionSync(packet.payload, senderId);
+        break;
+    }
+
+    if (packet.ttl && packet.ttl > 1) {
+      const relayPacket = { ...packet, ttl: packet.ttl - 1 };
+      this._dispatchToOverlay(relayPacket);
     }
   }
 
   /**
-   * Broadcast local state change and topics to all connected P2P peers and local tabs
+   * Compatibility method for test suite and direct invocations
    */
+  _handleIncomingMessage(data, peerId) {
+    if (!data) return;
+    if (data.type === 'BIBO_P2P_SYNC' || data.type === 'STATE_SYNC') {
+      this._mergeCRDTState(data.payload || data, peerId);
+    } else if (data.type === 'BIBO_P2P_NOTION' || data.type === 'NOTION_BROADCAST') {
+      if (this.onNotionSync) this.onNotionSync(data.payload || data, peerId);
+    } else {
+      this._handleGossipPacket(data, peerId);
+    }
+  }
+
+  _markAsSeen(id) {
+    this.seenMessages.add(id);
+    this.messageHistory.push(id);
+    if (this.messageHistory.length > this.maxSeenCache) {
+      const purged = this.messageHistory.shift();
+      this.seenMessages.delete(purged);
+    }
+  }
+
   broadcastState() {
     const customTopics = this.getCustomTopics ? this.getCustomTopics() : [];
-
     const payload = {
+      senderId: this.localPeerId,
       globalExp: this.pet.globalExp,
-      userContributedExp: this.pet.userContributedExp,
       pantry: { ...this.pet.pantry },
       hunger: this.pet.hunger,
       energy: this.pet.energy,
@@ -171,103 +254,62 @@ export class NetworkMesh {
       customTopics,
       timestamp: Date.now()
     };
-
-    // 1. Broadcast locally
-    if (this.localChannel) {
-      try {
-        this.localChannel.postMessage({ type: 'BIBO_P2P_SYNC', payload });
-      } catch (e) {}
-    }
-
-    // 2. Broadcast to WebRTC P2P peers
-    if (this._sendSync && this.peers.size > 0) {
-      try {
-        this._sendSync({ type: 'BIBO_P2P_SYNC', payload });
-      } catch (e) {
-        console.warn('[NetworkMesh] Send sync failed:', e);
-      }
-    }
+    this._emitGossip('STATE_SYNC', payload);
   }
 
-  /**
-   * Broadcast a newly donated community notion across the P2P mesh
-   */
   broadcastNotion(notion) {
-    if (!notion) return;
-
-    // 1. Broadcast to local tabs
-    if (this.localChannel) {
-      try {
-        this.localChannel.postMessage({ type: 'BIBO_P2P_NOTION', payload: notion });
-      } catch (e) {}
-    }
-
-    // 2. Broadcast to WebRTC P2P peers
-    if (this._sendNotion && this.peers.size > 0) {
-      try {
-        this._sendNotion(notion);
-      } catch (e) {
-        console.warn('[NetworkMesh] Send notion failed:', e);
-      }
-    }
+    this._emitGossip('NOTION_BROADCAST', notion);
   }
 
-  /**
-   * CRDT Reconciliation of incoming remote state
-   */
-  _handleIncomingMessage(msg, sourceId) {
-    if (!msg || msg.type !== 'BIBO_P2P_SYNC' || !msg.payload) return;
-    const p = msg.payload;
+  _mergeCRDTState(payload, sourceId) {
+    if (!payload) return;
+    let mutated = false;
 
-    let changed = false;
-
-    // 1. Monotonic EXP reconciliation (take maximum knowledge achieved)
-    if (typeof p.globalExp === 'number' && p.globalExp > this.pet.globalExp) {
-      this.pet.globalExp = p.globalExp;
-      changed = true;
+    // 1. Monotonic EXP Accumulation (G-Counter)
+    if (typeof payload.globalExp === 'number' && payload.globalExp > this.pet.globalExp) {
+      this.pet.globalExp = payload.globalExp;
+      mutated = true;
     }
 
-    // 2. Pantry stock merge (preserve items consumed or produced)
-    if (p.pantry) {
-      if (p.pantry.biscuit !== this.pet.pantry.biscuit ||
-          p.pantry.coffee !== this.pet.pantry.coffee ||
-          p.pantry.sponge !== this.pet.pantry.sponge) {
-        this.pet.pantry = {
-          biscuit: Math.max(0, p.pantry.biscuit),
-          coffee: Math.max(0, p.pantry.coffee),
-          sponge: Math.max(0, p.pantry.sponge)
-        };
-        changed = true;
+    // 2. Pantry stock (PN-Counter merge)
+    if (payload.pantry) {
+      const p = payload.pantry;
+      const b = Math.max(this.pet.pantry.biscuit, p.biscuit || 0);
+      const c = Math.max(this.pet.pantry.coffee, p.coffee || 0);
+      const s = Math.max(this.pet.pantry.sponge, p.sponge || 0);
+
+      if (b !== this.pet.pantry.biscuit || c !== this.pet.pantry.coffee || s !== this.pet.pantry.sponge) {
+        this.pet.pantry = { biscuit: b, coffee: c, sponge: s };
+        mutated = true;
       }
     }
 
-    // 3. Collective Biological Vitals & State (One shared Bibo for the entire community)
-    if (p.timestamp && p.timestamp > this.lastVitalsSyncTimestamp) {
-      if (typeof p.hunger === 'number' && typeof p.energy === 'number' && typeof p.cleanliness === 'number') {
-        this.pet.hunger = Math.max(0, Math.min(100, p.hunger));
-        this.pet.energy = Math.max(0, Math.min(100, p.energy));
-        this.pet.cleanliness = Math.max(0, Math.min(100, p.cleanliness));
-        if (p.state === 'AWAKE' || p.state === 'ASLEEP') {
-          this.pet.state = p.state;
-        }
-        this.lastVitalsSyncTimestamp = p.timestamp;
-        changed = true;
-      }
+    // 3. Vitals & State (Last-Write-Wins with monotonic timestamp)
+    if (payload.timestamp && payload.timestamp > (this.lastVitalsSyncTimestamp || 0)) {
+      if (typeof payload.hunger === 'number') this.pet.hunger = Math.max(0, Math.min(100, payload.hunger));
+      if (typeof payload.energy === 'number') this.pet.energy = Math.max(0, Math.min(100, payload.energy));
+      if (typeof payload.cleanliness === 'number') this.pet.cleanliness = Math.max(0, Math.min(100, payload.cleanliness));
+      if (payload.state) this.pet.state = payload.state;
+      this.lastVitalsSyncTimestamp = payload.timestamp;
+      mutated = true;
     }
 
-    // 4. Custom Topics Synchronization across community
-    if (Array.isArray(p.customTopics) && p.customTopics.length > 0) {
-      if (this.onTopicsSync) {
-        this.onTopicsSync(p.customTopics, sourceId);
-      }
+    // 4. Custom topics synchronization
+    if (Array.isArray(payload.customTopics) && this.onTopicsSync) {
+      this.onTopicsSync(payload.customTopics, sourceId);
     }
 
-    if (changed) {
+    if (mutated) {
       this.pet._savePantry();
       this.pet._saveVitals();
       this.pet._updateAnimationState();
       this.pet._notify(false);
-      console.log(`[NetworkMesh] Synchronized collective Bibo from peer [${sourceId}]. EXP: ${this.pet.globalExp}`);
+    }
+  }
+
+  _handleLocalBroadcast(e) {
+    if (e.data && e.data.type === 'BIBO_LOCAL_RELAY') {
+      this._handleGossipPacket(e.data.packet, 'local_tab');
     }
   }
 }

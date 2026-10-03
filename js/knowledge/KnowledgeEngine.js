@@ -72,6 +72,74 @@ export class KnowledgeEngine {
   }
 
   /**
+   * Canonical topic normalizer:
+   * Strips accents, unifies casing, trims whitespace, and maps common aliases
+   */
+  normalizeTopic(topic) {
+    if (!topic || typeof topic !== 'string') return '';
+    const clean = topic
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+
+    // Alias mapping for common variations
+    const aliasMap = {
+      'medicina': 'medicina',
+      'medicine': 'medicina',
+      'med': 'medicina',
+      'fisica': 'fisica',
+      'physics': 'fisica',
+      'chimica': 'chimica generale',
+      'chemistry': 'chimica generale',
+      'chimica generale': 'chimica generale',
+      'informatica': 'informatica',
+      'computer science': 'informatica',
+      'biologia': 'biologia',
+      'biology': 'biologia',
+      'diritto': 'diritto privato',
+      'diritto privato': 'diritto privato',
+      'economia': 'economia',
+      'economics': 'economia',
+      'storia': 'storia',
+      'history': 'storia',
+      'matematica': 'matematica',
+      'math': 'matematica'
+    };
+
+    if (aliasMap[clean]) return aliasMap[clean];
+
+    // Check fuzzy match against known aliases
+    for (const [alias, canonical] of Object.entries(aliasMap)) {
+      if (this._levenshteinDistance(clean, alias) <= 1 && Math.abs(clean.length - alias.length) <= 1) {
+        return canonical;
+      }
+    }
+
+    return clean;
+  }
+
+  _levenshteinDistance(a, b) {
+    const matrix = [];
+    for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+    for (let i = 1; i <= b.length; i++) {
+      for (let j = 1; j <= a.length; j++) {
+        if (b.charAt(i - 1) === a.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    return matrix[b.length][a.length];
+  }
+
+  /**
    * Helper to resolve localized string or object
    */
   _resolveText(val, locale) {
@@ -85,15 +153,18 @@ export class KnowledgeEngine {
    * Retrieves unique localized topic names from verified pool
    */
   getTopicsList(locale = (typeof i18n !== 'undefined' ? i18n.locale : 'it')) {
-    const set = new Set();
+    const map = new Map();
     const l = (locale === 'en') ? 'en' : 'it';
     this.verifiedPool.forEach(item => {
       const resolved = this._resolveText(item.topic, l);
       if (resolved && resolved.trim()) {
-        set.add(resolved.trim());
+        const norm = this.normalizeTopic(resolved);
+        if (!map.has(norm)) {
+          map.set(norm, resolved.trim());
+        }
       }
     });
-    return Array.from(set);
+    return Array.from(map.values());
   }
 
   /**
@@ -101,15 +172,19 @@ export class KnowledgeEngine {
    */
   getQuizForTopic(topicName, locale = (i18n ? i18n.locale : 'it')) {
     if (!topicName) return null;
-    const normalized = topicName.trim().toLowerCase();
+    const normalized = this.normalizeTopic(topicName);
     const l = (locale === 'en') ? 'en' : 'it';
 
-    // Match questions where topic in current language (or fallback) matches
+    // Match questions where normalized topic matches
     const matches = this.verifiedPool.filter(q => {
-      const topicIt = (typeof q.topic === 'object' ? q.topic.it : q.topic || '').toLowerCase();
-      const topicEn = (typeof q.topic === 'object' ? q.topic.en : q.topic || '').toLowerCase();
-      return topicIt.includes(normalized) || normalized.includes(topicIt) ||
-             topicEn.includes(normalized) || normalized.includes(topicEn);
+      const rawIt = typeof q.topic === 'object' ? (q.topic.it || '') : (q.topic || '');
+      const rawEn = typeof q.topic === 'object' ? (q.topic.en || '') : (q.topic || '');
+      const normIt = this.normalizeTopic(rawIt);
+      const normEn = this.normalizeTopic(rawEn);
+
+      return normIt === normalized || normEn === normalized ||
+             normIt.includes(normalized) || normalized.includes(normIt) ||
+             normEn.includes(normalized) || normalized.includes(normEn);
     });
 
     if (matches.length === 0) {

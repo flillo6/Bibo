@@ -12,6 +12,12 @@
 
 /* Color Variables */
 :root {
+  /* Dynamic Viewport & Safe Area Dimensions */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+
   /* Warm Paper (Default) */
   --bg-primary: #F5F0E8;
   --bg-surface: #EBE4D8;
@@ -89,11 +95,16 @@ body {
   font-size: 11px;
   line-height: 1.4;
   height: 100vh;
+  height: 100dvh;
+  height: 100svh;
   width: 100vw;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   transition: background-color 0.2s ease, color 0.2s ease;
+  padding-top: var(--sat);
+  padding-left: var(--sal);
+  padding-right: var(--sar);
 }
 
 /* Top Navigation HUD - Seamless Room Header */
@@ -831,15 +842,15 @@ body {
     min-height: 32px;
   }
 
-  /* Bottom HUD on mobile - Ergonomic Two-Tiered Retro Control Bar pinned to screen bottom */
+  /* Bottom HUD on mobile - Ergonomic Retro Control Bar pinned to screen bottom */
   .bottom-hud {
     height: auto;
     min-height: 76px;
     margin-top: auto !important;
     margin-bottom: 0 !important;
-    margin-left: auto;
-    margin-right: auto;
-    padding: 6px 16px max(18px, env(safe-area-inset-bottom, 22px));
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding: 8px 16px calc(12px + var(--sab)) !important;
     display: grid;
     grid-template-areas:
       "needs needs"
@@ -847,11 +858,13 @@ body {
     grid-template-columns: 1fr 1fr;
     row-gap: 8px;
     column-gap: 12px;
-    width: 100%;
-    max-width: 360px;
+    width: 100% !important;
+    max-width: 100% !important;
     flex-shrink: 0;
     box-sizing: border-box;
     align-items: center;
+    border-top: 1px solid var(--border-color);
+    background-color: var(--bg-surface);
   }
 
   .needs-grid {

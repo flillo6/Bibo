@@ -6,6 +6,7 @@
  */
 
 import { i18n } from '../i18n.js';
+import { SovereignCrypto } from './SovereignCrypto.js';
 
 const WORD_LIST_A = ['luna', 'sole', 'stella', 'bosco', 'fiume', 'vento', 'nube', 'farfalla', 'quercia', 'pietra'];
 const WORD_LIST_B = ['caffe', 'te', 'libro', 'foglio', 'penna', 'inchiostro', 'quaderno', 'lampada', 'scrittoio', 'clessidra'];
@@ -37,7 +38,8 @@ export class ProfileStorage {
       }
     }
 
-    // Generate new sovereign profile with 3-word secret phrase
+    // Generate new sovereign profile with 12-word mnemonic or classic phrase
+    const mnemonic = SovereignCrypto.generateMnemonic(12);
     const wordA = WORD_LIST_A[Math.floor(Math.random() * WORD_LIST_A.length)];
     const wordB = WORD_LIST_B[Math.floor(Math.random() * WORD_LIST_B.length)];
     const wordC = WORD_LIST_C[Math.floor(Math.random() * WORD_LIST_C.length)];
@@ -48,6 +50,7 @@ export class ProfileStorage {
       currentTopic: 'Chimica Generale',
       customTopics: ['Chimica Generale'],
       secretKey,
+      mnemonicPhrase: mnemonic,
       lifetimeSeconds: 0,
       currentStreakDays: 1,
       lastStudyDate: new Date().toISOString().split('T')[0],
@@ -112,17 +115,20 @@ export class ProfileStorage {
   }
 
   /**
-   * Restores profile using secret key
+   * Restores profile using secret key or 12-word mnemonic phrase
    */
   restoreWithKey(secretKey) {
     if (!secretKey || !secretKey.trim()) return false;
     const cleanKey = secretKey.trim().toLowerCase();
 
     // Check if key matches format
-    if (!cleanKey.startsWith('bibo-')) return false;
+    if (!SovereignCrypto.validatePhrase(cleanKey)) return false;
 
     // In a stateless deployment, key recovers state deterministically
     this.profile.secretKey = cleanKey;
+    if (!cleanKey.startsWith('bibo-')) {
+      this.profile.mnemonicPhrase = cleanKey;
+    }
     this.profile.onboardingComplete = true;
     this.saveProfile();
     return true;

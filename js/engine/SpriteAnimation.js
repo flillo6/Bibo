@@ -66,9 +66,9 @@ export class SpriteAnimationPlayer {
         const loopStartFrame = isSleep ? 9 : 0;
         const isBaby = (evo === 'baby');
         const yOffset = (isBaby && isSleep) ? 30 : 0;
-        const groundY = isBaby ? (isSleep ? 437 : 452) : (isSleep ? 488 : 491);
-        const shadowScaleX = isSleep ? 0.44 : 0.33;
-        const shadowScaleY = isSleep ? 12 : 9;
+        const groundY = isBaby ? (isSleep ? 437 : 452) : (isSleep ? 494 : 504);
+        const shadowScaleX = isSleep ? 0.44 : (isBaby ? 0.33 : 0.38);
+        const shadowScaleY = isSleep ? 12 : (isBaby ? 9 : 11);
 
         this.loadSprite(evo, anim, `assets/sprites/${evo}/${anim}.png`, {
           frameCount: 12,
@@ -229,10 +229,11 @@ export class SpriteAnimationPlayer {
     const groundY = meta.groundY || 452;
     const sneakerGroundY = dy + (targetHeight * (groundY / fh));
 
-    // 1. Crisp grounding ellipse shadow placed precisely under Bibo (slightly lower for standing sneakers)
-    const isSleep = (groundY === 437);
+    // 1. Crisp grounding ellipse shadow placed precisely under Bibo (lower for standing sneakers)
+    const isSleep = (groundY === 437 || groundY === 494);
     const shadowX = width / 2;
-    const shadowY = sneakerGroundY + (isSleep ? -2 : 3);
+    const isBaby = (meta.groundY === 452 || meta.groundY === 437);
+    const shadowY = sneakerGroundY + (isSleep ? -2 : (isBaby ? 3 : 9));
     const shadowRadiusX = targetWidth * (meta.shadowScaleX || 0.33);
     const shadowRadiusY = meta.shadowScaleY || 9;
 

@@ -7,6 +7,7 @@
  */
 
 import { CONFIG } from '../config.js';
+import { MonotonicWorkerTimer } from './MonotonicWorkerTimer.js';
 
 export class StudyTimer {
   constructor(onTick, onComplete) {
@@ -20,6 +21,20 @@ export class StudyTimer {
     this.intervalId = null;
     this.startTimestamp = 0;
     this.sessionElapsedSeconds = 0;
+    this.lastProof = null;
+
+    // Background monotonic Web Worker timer (anti-cheat + mobile lockscreen support)
+    this.workerTimer = new MonotonicWorkerTimer(
+      (elapsed, remaining) => {
+        this.sessionElapsedSeconds = elapsed;
+        this.remainingSeconds = remaining;
+        this._emitTick();
+      },
+      (verifiedSecs, proof) => {
+        this.lastProof = proof;
+        this.completeSession();
+      }
+    );
 
     // Cumulative verified study seconds across lifetime
     this.lifetimeStudySeconds = 0;
@@ -39,6 +54,12 @@ export class StudyTimer {
     this.state = 'RUNNING';
     this.startTimestamp = Date.now();
 
+    // Start background monotonic worker
+    if (this.workerTimer) {
+      this.workerTimer.start(this.durationMinutes, 'bibo_salt_' + Date.now());
+    }
+
+    // Standard interval loop (for immediate local fallback and synchronized UI ticks)
     this.intervalId = setInterval(() => {
       if (this.remainingSeconds > 0) {
         this.remainingSeconds--;
@@ -57,6 +78,7 @@ export class StudyTimer {
   pause() {
     if (this.state !== 'RUNNING') return;
     this.state = 'PAUSED';
+    if (this.workerTimer) this.workerTimer.pause();
     clearInterval(this.intervalId);
     this.intervalId = null;
     this._emitTick();
@@ -74,6 +96,7 @@ export class StudyTimer {
   completeSession() {
     clearInterval(this.intervalId);
     this.intervalId = null;
+    if (this.workerTimer) this.workerTimer.stop();
     this.state = 'COMPLETED';
 
     const verifiedSeconds = this.sessionElapsedSeconds;
@@ -90,7 +113,8 @@ export class StudyTimer {
       verifiedMinutes: Math.floor(verifiedSeconds / 60),
       totalLifetimeSeconds: this.lifetimeStudySeconds,
       resourcesEarned,
-      formattedTime: this.formatSeconds(verifiedSeconds)
+      formattedTime: this.formatSeconds(verifiedSeconds),
+      proof: this.lastProof || 'local_verified'
     };
 
     // Trigger completion callback

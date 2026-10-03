@@ -8,28 +8,31 @@
  * - Native iOS & Android PWA live revalidation
  */
 
-const CACHE_NAME = 'bibo-pwa-v5.5';
+const CACHE_NAME = 'bibo-pwa-v6.0';
 
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './css/style.css?v=5.3',
+  './css/style.css?v=6.0',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
   './js/config.js',
   './js/i18n.js',
-  './js/app.js?v=5.3',
+  './js/app.js?v=6.0',
   './js/audio/AudioSynthesizer.js',
   './js/engine/SpriteAnimation.js',
   './js/engine/PetManager.js',
   './js/engine/StudyTimer.js',
+  './js/engine/MonotonicWorkerTimer.js',
   './js/knowledge/StarterPack.js',
   './js/knowledge/KnowledgeEngine.js',
   './js/network/NetworkMesh.js',
   './js/storage/ProfileStorage.js',
+  './js/storage/SovereignCrypto.js',
   './js/vendor/trystero-torrent.js',
   './js/vendor/trystero-nostr.js',
+  // Baby sprites
   './assets/sprites/baby/idle_base.png',
   './assets/sprites/baby/idle_affamato.png',
   './assets/sprites/baby/idle_stanco.png',
@@ -38,14 +41,34 @@ const STATIC_ASSETS = [
   './assets/sprites/baby/clean_sponge.png',
   './assets/sprites/baby/sleep.png',
   './assets/sprites/baby/click_annoyed.png',
-  './assets/sprites/baby/victory_hop.png'
+  './assets/sprites/baby/victory_hop.png',
+  // Mid sprites
+  './assets/sprites/mid/idle_base.png',
+  './assets/sprites/mid/idle_affamato.png',
+  './assets/sprites/mid/idle_stanco.png',
+  './assets/sprites/mid/idle_sporco.png',
+  './assets/sprites/mid/eat_biscuit.png',
+  './assets/sprites/mid/clean_sponge.png',
+  './assets/sprites/mid/sleep.png',
+  './assets/sprites/mid/click_annoyed.png',
+  './assets/sprites/mid/victory_hop.png',
+  // Adult sprites
+  './assets/sprites/adult/idle_base.png',
+  './assets/sprites/adult/idle_affamato.png',
+  './assets/sprites/adult/idle_stanco.png',
+  './assets/sprites/adult/idle_sporco.png',
+  './assets/sprites/adult/eat_biscuit.png',
+  './assets/sprites/adult/clean_sponge.png',
+  './assets/sprites/adult/sleep.png',
+  './assets/sprites/adult/click_annoyed.png',
+  './assets/sprites/adult/victory_hop.png'
 ];
 
 // Install: Pre-cache all core application assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[ServiceWorker] Pre-caching offline assets for v5.3...');
+      console.log('[ServiceWorker] Pre-caching offline assets for v6.0...');
       return cache.addAll(STATIC_ASSETS);
     }).then(() => self.skipWaiting())
   );
