@@ -21,6 +21,38 @@
 
 ---
 
+## 🧠 La Mente Collettiva: Architettura a Rete Neurale Decentralizzata
+
+A differenza dei prodotti commerciali che delegano la conoscenza a modelli linguistici centralizzati (LLM di OpenAI o Google) — costosi, energivori, inclini ad allucinazioni e soggetti a paywall — **BIBO implementa una Rete Neurale Organica Decentralizzata**:
+
+```
+[ Studente A: Appunti di Studio ]  ---> [ Input Sensoriale: Donazione Nozione ]
+                                                     │
+                                                     ▼
+                                       [ Pesi Sinaptici: Peer-Review ]
+                                                     │
+                                  ┌──────────────────┴──────────────────┐
+                                  ▼                                     ▼
+                      [ Voto Discente IT ]                    [ Voto Discente EN ]
+                                  │                                     │
+                                  └──────────────────┬──────────────────┘
+                                                     ▼
+                                      [ Soglia di Attivazione: BFT 67% ]
+                                                     │
+                                                     ▼
+                                  [ Memoria Permanente: Grafo di Conoscenza ]
+                                                     │
+                                                     ▼
+                                  [ Sinapsi Bilingue: Traduzione Cross-Lingual ]
+```
+
+* **I Neuroni (I Discenti):** Ogni studente collegato a Bibo è un nodo cognitivo autonomo che apprende sui propri libri fisici e alimenta la rete.
+* **Le Sinapsi (Peer-Review Distribuita):** Quando uno studente dona una nozione, la rete la propaga ai peer della stessa materia. La validazione tra pari calibra i pesi sinaptici.
+* **La Soglia di Attivazione (Byzantine Fault Tolerance 67%):** Proprio come un neurone biologico scarica un potenziale d'azione solo quando gli stimoli eccitatori superano una soglia critica, Bibo incorpora una nozione nella propria memoria permanente solo al raggiungimento dei 2/3 (67%) di consenso.
+* **Plasticità Neurale Organica:** La mente di Bibo non è un dataset statico o congelato nel tempo, ma una memoria viva che cresce quotidianamente con le sessioni di studio della comunità globale, a **€0 di costi di calcolo** (Edge Computing).
+
+---
+
 ## 🏛️ Architettura di Sistema (C4 Container Model)
 
 ```mermaid
