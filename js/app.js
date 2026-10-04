@@ -409,12 +409,12 @@ class BiboApp {
 
     // Give earned resources to pantry
     if (summary.resourcesEarned > 0) {
-      this.pet.pantry.biscuit += summary.resourcesEarned;
+      this.pet.producePantryItem('biscuit', summary.resourcesEarned);
       if (minsStudied >= 20) {
-        this.pet.pantry.coffee += Math.max(1, Math.floor(summary.resourcesEarned / 2));
+        this.pet.producePantryItem('coffee', Math.max(1, Math.floor(summary.resourcesEarned / 2)));
       }
       if (minsStudied >= 40) {
-        this.pet.pantry.sponge += 1;
+        this.pet.producePantryItem('sponge', 1);
       }
       this.pet._savePantry();
       this.pet._notify(true);

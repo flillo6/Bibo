@@ -421,6 +421,7 @@ export class NetworkMesh {
       senderId: this.localPeerId,
       globalExp: this.pet.globalExp,
       pantry: { ...this.pet.pantry },
+      pantryCRDT: typeof this.pet.exportPantryCRDT === 'function' ? this.pet.exportPantryCRDT() : null,
       hunger: this.pet.hunger,
       energy: this.pet.energy,
       cleanliness: this.pet.cleanliness,
@@ -450,15 +451,42 @@ export class NetworkMesh {
       mutated = true;
     }
 
-    // 2. Pantry stock (PN-Counter merge)
-    if (payload.pantry) {
+    // 2. Pantry stock (True PN-Counter CRDT merge)
+    if (payload.pantryCRDT && typeof this.pet.mergePantryCRDT === 'function') {
+      const changed = this.pet.mergePantryCRDT(payload.pantryCRDT);
+      if (changed) mutated = true;
+    } else if (payload.pantry) {
+      // Legacy scalar compatibility fallback
       const p = payload.pantry;
-      const b = Math.max(this.pet.pantry.biscuit, p.biscuit || 0);
-      const c = Math.max(this.pet.pantry.coffee, p.coffee || 0);
-      const s = Math.max(this.pet.pantry.sponge, p.sponge || 0);
+      const b = Math.max(0, Number(p.biscuit) || 0);
+      const c = Math.max(0, Number(p.coffee) || 0);
+      const s = Math.max(0, Number(p.sponge) || 0);
+      const curB = this.pet.pantry.biscuit;
+      const curC = this.pet.pantry.coffee;
+      const curS = this.pet.pantry.sponge;
 
-      if (b !== this.pet.pantry.biscuit || c !== this.pet.pantry.coffee || s !== this.pet.pantry.sponge) {
-        this.pet.pantry = { biscuit: b, coffee: c, sponge: s };
+      if (b > curB) {
+        if (typeof this.pet.producePantryItem === 'function') {
+          this.pet.producePantryItem('biscuit', b - curB, sourceId || 'legacy_peer');
+        } else {
+          this.pet.pantry.biscuit = b;
+        }
+        mutated = true;
+      }
+      if (c > curC) {
+        if (typeof this.pet.producePantryItem === 'function') {
+          this.pet.producePantryItem('coffee', c - curC, sourceId || 'legacy_peer');
+        } else {
+          this.pet.pantry.coffee = c;
+        }
+        mutated = true;
+      }
+      if (s > curS) {
+        if (typeof this.pet.producePantryItem === 'function') {
+          this.pet.producePantryItem('sponge', s - curS, sourceId || 'legacy_peer');
+        } else {
+          this.pet.pantry.sponge = s;
+        }
         mutated = true;
       }
     }

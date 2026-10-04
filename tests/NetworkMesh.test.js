@@ -119,4 +119,155 @@ test('NetworkMesh - Synchronizes peer review votes across GossipSub overlay', ()
   assert.equal(receivedVote.studyMinutes, 45);
 });
 
+test('NetworkMesh - PN-Counter CRDT prevents item resurrection across multi-device sync', () => {
+  localStorage.clear();
+  const phonePet = new PetManager();
+  phonePet.nodeId = 'device_phone';
+  phonePet.hunger = 50;
+  phonePet.cleanliness = 50;
+  phonePet.producePantryItem('biscuit', 3, 'device_phone');
+  phonePet.producePantryItem('sponge', 1, 'device_phone');
+
+  const pcPet = new PetManager();
+  pcPet.nodeId = 'device_pc';
+  pcPet.hunger = 50;
+  pcPet.cleanliness = 50;
+
+  const phoneMesh = new NetworkMesh(phonePet);
+  phoneMesh.localPeerId = 'peer_phone';
+
+  const pcMesh = new NetworkMesh(pcPet);
+  pcMesh.localPeerId = 'peer_pc';
+
+  // 1. Initial sync from phone to PC
+  pcMesh._handleIncomingMessage({
+    type: 'STATE_SYNC',
+    payload: {
+      senderId: 'peer_phone',
+      globalExp: phonePet.globalExp,
+      pantry: { ...phonePet.pantry },
+      pantryCRDT: phonePet.exportPantryCRDT(),
+      timestamp: Date.now()
+    }
+  }, 'peer_phone');
+
+  assert.equal(phonePet.pantry.biscuit, 3, 'Phone should start with 3 biscuits');
+  assert.equal(pcPet.pantry.biscuit, 3, 'PC should receive 3 biscuits from sync');
+  assert.equal(phonePet.pantry.sponge, 1, 'Phone should start with 1 sponge');
+  assert.equal(pcPet.pantry.sponge, 1, 'PC should receive 1 sponge from sync');
+
+  // 2. User eats a biscuit on Phone: drops from 3 to 2
+  const feedRes = phonePet.feedBiscuit();
+  assert.equal(feedRes.success, true);
+  assert.equal(phonePet.pantry.biscuit, 2, 'Phone biscuit count drops to 2');
+
+  // 3. Phone broadcasts STATE_SYNC with new CRDT state to PC
+  pcMesh._handleIncomingMessage({
+    type: 'STATE_SYNC',
+    payload: {
+      senderId: 'peer_phone',
+      globalExp: phonePet.globalExp,
+      pantry: { ...phonePet.pantry },
+      pantryCRDT: phonePet.exportPantryCRDT(),
+      timestamp: Date.now()
+    }
+  }, 'peer_phone');
+
+  assert.equal(pcPet.pantry.biscuit, 2, 'PC adopts consumed biscuit: drops to 2');
+
+  // 4. PC heartbeats back to Phone (the previous BUG: Math.max resurrected biscuit back to 3)
+  phoneMesh._handleIncomingMessage({
+    type: 'STATE_SYNC',
+    payload: {
+      senderId: 'peer_pc',
+      globalExp: pcPet.globalExp,
+      pantry: { ...pcPet.pantry },
+      pantryCRDT: pcPet.exportPantryCRDT(),
+      timestamp: Date.now()
+    }
+  }, 'peer_pc');
+
+  assert.equal(phonePet.pantry.biscuit, 2, 'Phone biscuit count MUST stay at 2 (no resurrection!)');
+
+  // 5. User cleans with sponge on Phone (1 -> 0)
+  const spongeRes = phonePet.cleanWithSponge();
+  assert.equal(spongeRes.success, true);
+  assert.equal(phonePet.pantry.sponge, 0, 'Phone sponge drops to 0');
+
+  // Sync sponge consumption to PC
+  pcMesh._handleIncomingMessage({
+    type: 'STATE_SYNC',
+    payload: {
+      senderId: 'peer_phone',
+      globalExp: phonePet.globalExp,
+      pantry: { ...phonePet.pantry },
+      pantryCRDT: phonePet.exportPantryCRDT(),
+      timestamp: Date.now()
+    }
+  }, 'peer_phone');
+
+  assert.equal(pcPet.pantry.sponge, 0, 'PC sponge drops to 0');
+
+  // PC attempts to use sponge when depleted
+  const pcSpongeRes = pcPet.cleanWithSponge();
+  assert.equal(pcSpongeRes.success, false, 'PC cannot use depleted sponge');
+});
+
+test('NetworkMesh - PN-Counter CRDT converges under concurrent multi-peer consumption (1000+ peers scenario)', () => {
+  localStorage.clear();
+  const peerA = new PetManager();
+  peerA.nodeId = 'node_A';
+  peerA.producePantryItem('biscuit', 10, 'node_A');
+
+  const peerB = new PetManager();
+  peerB.nodeId = 'node_B';
+  const peerC = new PetManager();
+  peerC.nodeId = 'node_C';
+
+  const meshB = new NetworkMesh(peerB);
+  const meshC = new NetworkMesh(peerC);
+  const meshA = new NetworkMesh(peerA);
+
+  // Sync initial 10 biscuits to B and C
+  const initialPayload = {
+    senderId: 'peer_A',
+    globalExp: peerA.globalExp,
+    pantry: { ...peerA.pantry },
+    pantryCRDT: peerA.exportPantryCRDT(),
+    timestamp: Date.now()
+  };
+  meshB._handleIncomingMessage(initialPayload, 'peer_A');
+  meshC._handleIncomingMessage(initialPayload, 'peer_A');
+
+  assert.equal(peerA.pantry.biscuit, 10);
+  assert.equal(peerB.pantry.biscuit, 10);
+  assert.equal(peerC.pantry.biscuit, 10);
+
+  // Concurrent consumption:
+  // Node A eats 2 biscuits
+  peerA.consumePantryItem('biscuit', 2, 'node_A');
+  // Node B eats 3 biscuits
+  peerB.consumePantryItem('biscuit', 3, 'node_B');
+  // Node C eats 1 biscuit
+  peerC.consumePantryItem('biscuit', 1, 'node_C');
+
+  // Total consumed concurrently: 2 + 3 + 1 = 6 biscuits.
+  // Remaining should be 10 - 6 = 4 biscuits across all nodes once synced.
+
+  // Gossip propagation:
+  meshA._handleIncomingMessage({ type: 'STATE_SYNC', payload: { pantryCRDT: peerB.exportPantryCRDT(), timestamp: Date.now() } }, 'peer_B');
+  meshA._handleIncomingMessage({ type: 'STATE_SYNC', payload: { pantryCRDT: peerC.exportPantryCRDT(), timestamp: Date.now() } }, 'peer_C');
+
+  meshB._handleIncomingMessage({ type: 'STATE_SYNC', payload: { pantryCRDT: peerA.exportPantryCRDT(), timestamp: Date.now() } }, 'peer_A');
+  meshB._handleIncomingMessage({ type: 'STATE_SYNC', payload: { pantryCRDT: peerC.exportPantryCRDT(), timestamp: Date.now() } }, 'peer_C');
+
+  meshC._handleIncomingMessage({ type: 'STATE_SYNC', payload: { pantryCRDT: peerA.exportPantryCRDT(), timestamp: Date.now() } }, 'peer_A');
+  meshC._handleIncomingMessage({ type: 'STATE_SYNC', payload: { pantryCRDT: peerB.exportPantryCRDT(), timestamp: Date.now() } }, 'peer_B');
+
+  assert.equal(peerA.pantry.biscuit, 4, 'Peer A should converge to 4 biscuits');
+  assert.equal(peerB.pantry.biscuit, 4, 'Peer B should converge to 4 biscuits');
+  assert.equal(peerC.pantry.biscuit, 4, 'Peer C should converge to 4 biscuits');
+});
+
+
 

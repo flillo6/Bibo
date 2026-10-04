@@ -62,13 +62,12 @@ export class PetManager {
     this.userContributedExp = parseInt((typeof localStorage !== 'undefined' ? localStorage.getItem('bibo_user_contributed_exp') : '0') || '0', 10);
     this.globalExp = baseSeedExp + this.userContributedExp;
 
-    // Global Pantry stock (persisted, zero mock start)
-    const savedPantry = typeof localStorage !== 'undefined' ? localStorage.getItem('bibo_global_pantry') : null;
-    this.pantry = savedPantry ? JSON.parse(savedPantry) : {
-      biscuit: 0,
-      coffee: 0,
-      sponge: 0
-    };
+    // Unique persistent actor/node ID for PN-Counter CRDT
+    this.nodeId = this._initNodeId();
+
+    // CRDT PN-Counter state initialization (Positive / Negative vectors)
+    this._pnPantry = this._loadPNPantry();
+    this._pantryProxy = this._createPantryProxy();
 
     // Biological States: 'AWAKE' | 'ASLEEP'
     if (this.globalExp >= CONFIG.GLOBAL_PROGRESSION.TARGET_EXP_ERA_3) {
@@ -101,7 +100,11 @@ export class PetManager {
           const p = event.data.payload;
           this.globalExp = p.globalExp;
           this.userContributedExp = p.userContributedExp;
-          this.pantry = { ...p.pantry };
+          if (p.pantryCRDT) {
+            this.mergePantryCRDT(p.pantryCRDT);
+          } else if (p.pantry) {
+            this.pantry = { ...p.pantry };
+          }
           this.hunger = p.hunger;
           this.energy = p.energy;
           this.cleanliness = p.cleanliness;
@@ -161,9 +164,232 @@ export class PetManager {
     };
   }
 
+  get pantry() {
+    return this._pantryProxy;
+  }
+
+  set pantry(val) {
+    if (val && typeof val === 'object') {
+      for (const item of ['biscuit', 'coffee', 'sponge']) {
+        if (typeof val[item] === 'number') {
+          this._pantryProxy[item] = val[item];
+        }
+      }
+    }
+  }
+
+  _initNodeId() {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        let id = localStorage.getItem('bibo_node_id');
+        if (!id) {
+          id = 'node_' + Math.random().toString(36).slice(2, 10);
+          localStorage.setItem('bibo_node_id', id);
+        }
+        return id;
+      } catch (_) {}
+    }
+    return 'node_' + Math.random().toString(36).slice(2, 10);
+  }
+
+  _loadPNPantry() {
+    const defaultState = {
+      produced: { biscuit: {}, coffee: {}, sponge: {} },
+      consumed: { biscuit: {}, coffee: {}, sponge: {} }
+    };
+
+    if (typeof localStorage === 'undefined') return defaultState;
+
+    try {
+      const raw = localStorage.getItem('bibo_pantry_pn_v1');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.produced && parsed.consumed) {
+          return {
+            produced: {
+              biscuit: { ...(parsed.produced.biscuit || {}) },
+              coffee: { ...(parsed.produced.coffee || {}) },
+              sponge: { ...(parsed.produced.sponge || {}) }
+            },
+            consumed: {
+              biscuit: { ...(parsed.consumed.biscuit || {}) },
+              coffee: { ...(parsed.consumed.coffee || {}) },
+              sponge: { ...(parsed.consumed.sponge || {}) }
+            }
+          };
+        }
+      }
+
+      // Backward compatibility: migrate legacy scalar bibo_global_pantry under common genesis_pool
+      const legacyRaw = localStorage.getItem('bibo_global_pantry');
+      if (legacyRaw) {
+        const legacy = JSON.parse(legacyRaw);
+        if (legacy && typeof legacy === 'object') {
+          if (legacy.biscuit) defaultState.produced.biscuit['genesis_pool'] = Math.max(0, Number(legacy.biscuit) || 0);
+          if (legacy.coffee) defaultState.produced.coffee['genesis_pool'] = Math.max(0, Number(legacy.coffee) || 0);
+          if (legacy.sponge) defaultState.produced.sponge['genesis_pool'] = Math.max(0, Number(legacy.sponge) || 0);
+        }
+      }
+    } catch (e) {
+      console.warn('Error loading PN-Pantry state:', e);
+    }
+
+    return defaultState;
+  }
+
+  _createPantryProxy() {
+    const self = this;
+    return new Proxy({
+      biscuit: 0,
+      coffee: 0,
+      sponge: 0
+    }, {
+      get(target, prop) {
+        if (prop === 'biscuit' || prop === 'coffee' || prop === 'sponge') {
+          return self.getPantryItemCount(prop);
+        }
+        return target[prop];
+      },
+      set(target, prop, value) {
+        if (prop === 'biscuit' || prop === 'coffee' || prop === 'sponge') {
+          const current = self.getPantryItemCount(prop);
+          const targetVal = Math.max(0, Number(value) || 0);
+          const delta = targetVal - current;
+          if (delta > 0) {
+            self.producePantryItem(prop, delta, self.nodeId);
+          } else if (delta < 0) {
+            self.consumePantryItem(prop, Math.abs(delta), self.nodeId);
+          }
+          return true;
+        }
+        target[prop] = value;
+        return true;
+      },
+      ownKeys(target) {
+        return ['biscuit', 'coffee', 'sponge'];
+      },
+      getOwnPropertyDescriptor(target, prop) {
+        if (prop === 'biscuit' || prop === 'coffee' || prop === 'sponge') {
+          return {
+            enumerable: true,
+            configurable: true,
+            value: self.getPantryItemCount(prop),
+            writable: true
+          };
+        }
+        return Reflect.getOwnPropertyDescriptor(target, prop);
+      }
+    });
+  }
+
+  getPantryItemCount(itemName) {
+    if (!this._pnPantry) return 0;
+    const prodMap = this._pnPantry.produced[itemName] || {};
+    const consMap = this._pnPantry.consumed[itemName] || {};
+
+    let totalProduced = 0;
+    for (const actor in prodMap) {
+      totalProduced += prodMap[actor] || 0;
+    }
+
+    let totalConsumed = 0;
+    for (const actor in consMap) {
+      totalConsumed += consMap[actor] || 0;
+    }
+
+    return Math.max(0, totalProduced - totalConsumed);
+  }
+
+  producePantryItem(itemName, qty = 1, actorId = this.nodeId) {
+    const amount = Math.floor(Number(qty) || 0);
+    if (amount <= 0 || !['biscuit', 'coffee', 'sponge'].includes(itemName)) return;
+    if (!this._pnPantry.produced[itemName]) {
+      this._pnPantry.produced[itemName] = {};
+    }
+    const cur = this._pnPantry.produced[itemName][actorId] || 0;
+    this._pnPantry.produced[itemName][actorId] = cur + amount;
+    this._savePantry();
+  }
+
+  consumePantryItem(itemName, qty = 1, actorId = this.nodeId) {
+    const amount = Math.floor(Number(qty) || 0);
+    if (amount <= 0 || !['biscuit', 'coffee', 'sponge'].includes(itemName)) return;
+    if (!this._pnPantry.consumed[itemName]) {
+      this._pnPantry.consumed[itemName] = {};
+    }
+    const cur = this._pnPantry.consumed[itemName][actorId] || 0;
+    this._pnPantry.consumed[itemName][actorId] = cur + amount;
+    this._savePantry();
+  }
+
+  exportPantryCRDT() {
+    return {
+      produced: JSON.parse(JSON.stringify(this._pnPantry.produced)),
+      consumed: JSON.parse(JSON.stringify(this._pnPantry.consumed))
+    };
+  }
+
+  mergePantryCRDT(remoteCRDT) {
+    if (!remoteCRDT || typeof remoteCRDT !== 'object') return false;
+    let mutated = false;
+    const items = ['biscuit', 'coffee', 'sponge'];
+
+    // 1. Pointwise maximum for Produced vector (G-Counter)
+    if (remoteCRDT.produced && typeof remoteCRDT.produced === 'object') {
+      for (const item of items) {
+        const remoteActors = remoteCRDT.produced[item];
+        if (remoteActors && typeof remoteActors === 'object') {
+          if (!this._pnPantry.produced[item]) this._pnPantry.produced[item] = {};
+          for (const [actor, count] of Object.entries(remoteActors)) {
+            if (typeof actor === 'string' && actor.length > 0 && actor.length <= 64) {
+              const num = Math.floor(Number(count) || 0);
+              if (num > 0) {
+                const localCount = this._pnPantry.produced[item][actor] || 0;
+                if (num > localCount) {
+                  this._pnPantry.produced[item][actor] = num;
+                  mutated = true;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Pointwise maximum for Consumed vector (G-Counter)
+    if (remoteCRDT.consumed && typeof remoteCRDT.consumed === 'object') {
+      for (const item of items) {
+        const remoteActors = remoteCRDT.consumed[item];
+        if (remoteActors && typeof remoteActors === 'object') {
+          if (!this._pnPantry.consumed[item]) this._pnPantry.consumed[item] = {};
+          for (const [actor, count] of Object.entries(remoteActors)) {
+            if (typeof actor === 'string' && actor.length > 0 && actor.length <= 64) {
+              const num = Math.floor(Number(count) || 0);
+              if (num > 0) {
+                const localCount = this._pnPantry.consumed[item][actor] || 0;
+                if (num > localCount) {
+                  this._pnPantry.consumed[item][actor] = num;
+                  mutated = true;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (mutated) {
+      this._savePantry();
+    }
+    return mutated;
+  }
+
   _savePantry() {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('bibo_global_pantry', JSON.stringify(this.pantry));
+      try {
+        localStorage.setItem('bibo_global_pantry', JSON.stringify({ ...this.pantry }));
+        localStorage.setItem('bibo_pantry_pn_v1', JSON.stringify(this._pnPantry));
+      } catch (_) {}
     }
   }
 
@@ -260,7 +486,8 @@ export class PetManager {
           payload: {
             globalExp: this.globalExp,
             userContributedExp: this.userContributedExp,
-            pantry: this.pantry,
+            pantry: { ...this.pantry },
+            pantryCRDT: this.exportPantryCRDT(),
             hunger: this.hunger,
             energy: this.energy,
             cleanliness: this.cleanliness,
@@ -422,8 +649,7 @@ export class PetManager {
       return { success: false, message: i18n.t('pantry.warn.empty') };
     }
 
-    this.pantry.biscuit--;
-    this._savePantry();
+    this.consumePantryItem('biscuit', 1);
     this.hunger = Math.min(100, this.hunger + CONFIG.NEEDS.HUNGER.snackBoost);
     this.lastActionTimestamp = Date.now();
     this._saveVitals();
@@ -450,8 +676,7 @@ export class PetManager {
       return { success: false, message: i18n.t('pantry.warn.empty') };
     }
 
-    this.pantry.coffee--;
-    this._savePantry();
+    this.consumePantryItem('coffee', 1);
     this.energy = Math.min(100, this.energy + CONFIG.NEEDS.ENERGY.coffeeBoost);
     this.lastActionTimestamp = Date.now();
     this._saveVitals();
@@ -491,8 +716,7 @@ export class PetManager {
       return { success: false, message: i18n.t('pantry.warn.empty') };
     }
 
-    this.pantry.sponge--;
-    this._savePantry();
+    this.consumePantryItem('sponge', 1);
     this.cleanliness = Math.min(100, this.cleanliness + CONFIG.NEEDS.CLEANLINESS.spongeBoost);
     this.lastActionTimestamp = Date.now();
     this._saveVitals();
