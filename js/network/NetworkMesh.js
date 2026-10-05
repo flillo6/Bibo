@@ -31,6 +31,8 @@ export class NetworkMesh {
     this.roomNostr = null;
 
     this.nostrSockets = [];
+    this.nostrRetryTimers = new Map();
+    this.nostrFailureCounts = new Map();
     this.nostrCreateEvent = null;
     this.nostrTopic = 'bibo-global-gossip-v3';
     this.nostrKind = 22002;
@@ -74,11 +76,11 @@ export class NetworkMesh {
     ];
 
     const nostrRelays = [
-      'wss://nos.lol',
-      'wss://nostr.mom',
-      'wss://relay.primal.net',
+      'wss://relay.damus.io',
       'wss://purplerelay.com',
-      'wss://relay.snort.social'
+      'wss://relay.snort.social',
+      'wss://nostr-pub.wellorder.net',
+      'wss://offchain.pub'
     ];
 
     await Promise.allSettled([
@@ -123,10 +125,24 @@ export class NetworkMesh {
 
   _connectNostrRelay(url) {
     if (typeof WebSocket === 'undefined') return;
+
+    // Guard: Do not reconnect if already open or connecting
+    const existing = this.nostrSockets.find(s => s._url === url);
+    if (existing && (existing.readyState === 0 || existing.readyState === 1)) {
+      return;
+    }
+
+    // Clear any pending retry timer for this url
+    if (this.nostrRetryTimers.has(url)) {
+      clearTimeout(this.nostrRetryTimers.get(url));
+      this.nostrRetryTimers.delete(url);
+    }
+
     try {
       const ws = new WebSocket(url);
       ws._url = url;
       ws.onopen = () => {
+        this.nostrFailureCounts.set(url, 0); // reset failure count on success
         console.log(`[NetworkMesh] Nostr Sovereign Bus connected: ${url}`);
         ws.send(JSON.stringify(['REQ', 'sub_bibo_bus', {
           kinds: [this.nostrKind],
@@ -147,7 +163,19 @@ export class NetworkMesh {
         const idx = this.nostrSockets.indexOf(ws);
         if (idx !== -1) this.nostrSockets.splice(idx, 1);
         if (!this._isDestroyed) {
-          setTimeout(() => this._connectNostrRelay(url), 3000 + Math.random() * 2000);
+          const failures = (this.nostrFailureCounts.get(url) || 0) + 1;
+          this.nostrFailureCounts.set(url, failures);
+
+          // Exponential backoff: 5s, 15s, 30s, up to 120s max. Prevents hammering failing relays.
+          const backoffMs = Math.min(120000, Math.pow(2, Math.min(failures, 5)) * 3000 + Math.random() * 2000);
+
+          if (!this.nostrRetryTimers.has(url)) {
+            const timer = setTimeout(() => {
+              this.nostrRetryTimers.delete(url);
+              this._connectNostrRelay(url);
+            }, backoffMs);
+            this.nostrRetryTimers.set(url, timer);
+          }
         }
       };
       ws.onerror = () => {};
@@ -159,7 +187,7 @@ export class NetworkMesh {
     if (!this.nostrRelayUrls) return;
     const activeUrls = new Set(this.nostrSockets.filter(s => s.readyState === 1 || s.readyState === 0).map(s => s._url));
     for (const url of this.nostrRelayUrls) {
-      if (!activeUrls.has(url)) {
+      if (!activeUrls.has(url) && !this.nostrRetryTimers.has(url)) {
         this._connectNostrRelay(url);
       }
     }
