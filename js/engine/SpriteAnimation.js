@@ -233,6 +233,9 @@ export class SpriteAnimationPlayer {
               this.onComplete = null;
               cb();
               return;
+            } else {
+              // Safety fallback: if one-shot finished with no callback, return to looping idle!
+              this.play(CONFIG.ANIMATIONS.IDLE_BASE, true);
             }
           }
         } else {

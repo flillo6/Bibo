@@ -119,3 +119,22 @@ test('PetManager - Offline vitals persistence and time-elapsed decay calculation
   assert.equal(pet.pantry.biscuit, 0); // Zero start verified
   assert.equal(pet.globalExp, 0);       // Zero start verified
 });
+
+test('PetManager - adoptGlobalExp persists EXP to localStorage and evolves companion', () => {
+  localStorage.clear();
+  const pet = new PetManager();
+  assert.equal(pet.globalExp, 0);
+  assert.equal(pet.activeEvolution, 'baby');
+
+  const res = pet.adoptGlobalExp(1200);
+  assert.equal(res, true);
+  assert.equal(pet.globalExp, 1200);
+  assert.equal(pet.userContributedExp, 1200);
+  assert.equal(localStorage.getItem('bibo_user_contributed_exp'), '1200');
+  assert.equal(pet.activeEvolution, 'mid', 'Should dynamically advance evolution stage upon adopting milestone EXP');
+
+  // New instance immediately reads persisted EXP from localStorage
+  const freshPet = new PetManager();
+  assert.equal(freshPet.globalExp, 1200, 'Fresh instance should boot with persisted EXP');
+  assert.equal(freshPet.activeEvolution, 'mid');
+});

@@ -19,7 +19,7 @@ import { PetManager } from './engine/PetManager.js';
 import { StudyTimer } from './engine/StudyTimer.js';
 import { KnowledgeEngine } from './knowledge/KnowledgeEngine.js';
 import { profileStorage } from './storage/ProfileStorage.js';
-import { NetworkMesh } from './network/NetworkMesh.js?v=6.8';
+import { NetworkMesh } from './network/NetworkMesh.js?v=6.9';
 
 class BiboApp {
   constructor() {
@@ -55,8 +55,15 @@ class BiboApp {
     // 1. Initialize Sprite Engine
     await this.anim.init();
 
-    // 2. Setup Page Visibility API (0.0% CPU when tab hidden)
-    document.addEventListener('visibilitychange', () => this._handleVisibilityChange());
+    // Align initial evolution stage and animation state with PetManager vitals
+    this.anim.setEvolution(this.pet.activeEvolution);
+    this.pet._updateAnimationState();
+
+    // 2. Setup Page Visibility & Mobile Lifecycle API (0.0% CPU when tab hidden, instant wake resume on unlock)
+    const handleForeground = () => this._handleVisibilityChange();
+    document.addEventListener('visibilitychange', handleForeground);
+    window.addEventListener('pageshow', handleForeground);
+    window.addEventListener('focus', handleForeground);
 
     // 3. Setup Natural Biological Decay Timer (Every 60s)
     setInterval(() => this.pet.tickMinute(), 60000);
@@ -173,6 +180,10 @@ class BiboApp {
       // Instantly recalculate natural biological decay for time spent away
       if (this.pet && typeof this.pet.refreshOfflineDecay === 'function') {
         this.pet.refreshOfflineDecay();
+      }
+      // Re-align animation in case state transitioned while away
+      if (this.pet && typeof this.pet._updateAnimationState === 'function') {
+        this.pet._updateAnimationState();
       }
     }
   }
@@ -1239,7 +1250,9 @@ class BiboApp {
     bubble.textContent = text;
     bubble.classList.add('visible');
 
-    if (this.pet.state === 'ASLEEP') {
+    // Speech bubble positioning: only pin to bottom floor if Bibo is ACTUALLY rendering sleeping sprite!
+    const isVisuallySleeping = this.anim && this.anim.currentAnim === CONFIG.ANIMATIONS.SLEEP;
+    if (isVisuallySleeping) {
       bubble.classList.add('sleeping');
     } else {
       bubble.classList.remove('sleeping');

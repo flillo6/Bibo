@@ -118,6 +118,9 @@ export class PetManager {
         }
       };
     }
+
+    // Immediately align initial animation state with loaded vitals and sleep state
+    this._updateAnimationState();
   }
 
   subscribe(callback) {
@@ -127,6 +130,42 @@ export class PetManager {
 
   get globalExpPercent() {
     return Math.min(100, Math.floor((this.globalExp / this.eraTargetExp) * 100));
+  }
+
+  /**
+   * Adopts and permanently persists global EXP received from peer synchronization
+   */
+  adoptGlobalExp(newExp) {
+    if (typeof newExp !== 'number' || newExp <= this.globalExp) return false;
+    const baseSeedExp = CONFIG.GLOBAL_PROGRESSION.SEED_BASELINE_EXP || 0;
+    this.globalExp = newExp;
+    this.userContributedExp = Math.max(this.userContributedExp, newExp - baseSeedExp);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('bibo_user_contributed_exp', String(this.userContributedExp));
+    }
+
+    let nextEvo = this.activeEvolution;
+    if (!this.isTestEvoLocked) {
+      nextEvo = 'baby';
+      if (this.globalExp >= CONFIG.GLOBAL_PROGRESSION.TARGET_EXP_ERA_3) {
+        nextEvo = 'adult';
+      } else if (this.globalExp >= CONFIG.GLOBAL_PROGRESSION.TARGET_EXP_ERA_2) {
+        nextEvo = 'mid';
+      }
+
+      if (nextEvo !== this.activeEvolution) {
+        this.activeEvolution = nextEvo;
+        if (this.anim) {
+          this.anim.setEvolution(nextEvo);
+        }
+        if (this.onEvolution) {
+          this.onEvolution(nextEvo);
+        }
+      }
+    }
+
+    this._notify(false);
+    return true;
   }
 
   gainExp(amountExp, source = '') {

@@ -470,9 +470,13 @@ export class NetworkMesh {
     if (!payload) return;
     let mutated = false;
 
-    // 1. Monotonic EXP Accumulation (G-Counter)
+    // 1. Monotonic EXP Accumulation (G-Counter with persistent storage)
     if (typeof payload.globalExp === 'number' && payload.globalExp > this.pet.globalExp) {
-      this.pet.globalExp = payload.globalExp;
+      if (typeof this.pet.adoptGlobalExp === 'function') {
+        this.pet.adoptGlobalExp(payload.globalExp);
+      } else {
+        this.pet.globalExp = payload.globalExp;
+      }
       mutated = true;
     }
 
