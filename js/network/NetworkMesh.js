@@ -77,8 +77,7 @@ export class NetworkMesh {
 
     const nostrRelays = [
       'wss://purplerelay.com',
-      'wss://relay.snort.social',
-      'wss://nostr.einundzwanzig.space'
+      'wss://relay.snort.social'
     ];
 
     await Promise.allSettled([
