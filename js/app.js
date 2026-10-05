@@ -19,7 +19,7 @@ import { PetManager } from './engine/PetManager.js';
 import { StudyTimer } from './engine/StudyTimer.js';
 import { KnowledgeEngine } from './knowledge/KnowledgeEngine.js';
 import { profileStorage } from './storage/ProfileStorage.js';
-import { NetworkMesh } from './network/NetworkMesh.js?v=6.5';
+import { NetworkMesh } from './network/NetworkMesh.js?v=6.6';
 
 class BiboApp {
   constructor() {

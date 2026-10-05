@@ -78,9 +78,7 @@ export class NetworkMesh {
     const nostrRelays = [
       'wss://purplerelay.com',
       'wss://relay.snort.social',
-      'wss://nostr-pub.wellorder.net',
-      'wss://nostr.bitcoiner.social',
-      'wss://relay.nostr.net'
+      'wss://nostr.bitcoiner.social'
     ];
 
     await Promise.allSettled([
@@ -201,7 +199,7 @@ export class NetworkMesh {
       const config = {
         appId: 'bibo-16bit-sovereign-mesh',
         relayUrls: relays,
-        relayConfig: { urls: relays },
+        relayConfig: { urls: relays, redundancy: 2 },
         rtcConfig,
         trickleIce: true
       };
