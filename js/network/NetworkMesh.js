@@ -76,11 +76,11 @@ export class NetworkMesh {
     ];
 
     const nostrRelays = [
-      'wss://relay.damus.io',
       'wss://purplerelay.com',
       'wss://relay.snort.social',
       'wss://nostr-pub.wellorder.net',
-      'wss://offchain.pub'
+      'wss://nostr.bitcoiner.social',
+      'wss://relay.nostr.net'
     ];
 
     await Promise.allSettled([
