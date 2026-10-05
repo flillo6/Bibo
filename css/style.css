@@ -280,8 +280,8 @@ body {
 }
 
 .speech-bubble.sleeping {
-  top: auto;
-  bottom: 12px;
+  top: 36px;
+  bottom: auto;
 }
 
 .speech-bubble::after {
@@ -293,13 +293,6 @@ body {
   border-width: 6px 6px 0;
   border-style: solid;
   border-color: var(--border-color) transparent;
-}
-
-.speech-bubble.sleeping::after {
-  bottom: auto;
-  top: -6px;
-  border-width: 0 6px 6px;
-  border-color: transparent transparent var(--border-color);
 }
 
 /* Timer Monolith */
@@ -857,8 +850,8 @@ body {
   }
 
   .speech-bubble.sleeping {
-    top: auto;
-    bottom: 6px;
+    top: 22px;
+    bottom: auto;
   }
 
   .timer-display {

@@ -19,7 +19,7 @@ import { PetManager } from './engine/PetManager.js';
 import { StudyTimer } from './engine/StudyTimer.js';
 import { KnowledgeEngine } from './knowledge/KnowledgeEngine.js';
 import { profileStorage } from './storage/ProfileStorage.js';
-import { NetworkMesh } from './network/NetworkMesh.js?v=6.9';
+import { NetworkMesh } from './network/NetworkMesh.js?v=7.0';
 
 class BiboApp {
   constructor() {
@@ -688,7 +688,7 @@ class BiboApp {
 
       // If Bibo is sleeping, do NOT play annoyed or victory, and do not show their text!
       if (this.pet.state === 'ASLEEP') {
-        this._showSpeechBubble(i18n.t('bubble.needs.sleeping_touch'), true);
+        this._showSpeechBubble(i18n.t('bubble.needs.sleeping_touch'), false);
         return;
       }
 
@@ -1234,7 +1234,7 @@ class BiboApp {
         this._showSpeechBubble(i18n.t('bubble.needs.dirty'), true);
         break;
       case CONFIG.ANIMATIONS.SLEEP:
-        this._showSpeechBubble(i18n.t('bubble.needs.sleep'), true);
+        this._showSpeechBubble(i18n.t('bubble.needs.sleep'), false);
         break;
       case CONFIG.ANIMATIONS.IDLE_BASE:
         this._hideSpeechBubble();
