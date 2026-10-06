@@ -32,6 +32,9 @@ export class ProfileStorage {
         }
         if (loaded.biboLevel === undefined) loaded.biboLevel = 1;
         if (loaded.biboExp === undefined) loaded.biboExp = 0;
+        if (!loaded.createdAt || typeof loaded.createdAt !== 'number') {
+          loaded.createdAt = Date.now() - 3600000; // 1 hour grace baseline
+        }
         return loaded;
       } catch (e) {
         console.error('Error parsing profile, regenerating:', e);
@@ -51,6 +54,7 @@ export class ProfileStorage {
       customTopics: ['Chimica Generale'],
       secretKey,
       mnemonicPhrase: mnemonic,
+      createdAt: Date.now(),
       lifetimeSeconds: 0,
       currentStreakDays: 1,
       lastStudyDate: new Date().toISOString().split('T')[0],
@@ -64,6 +68,50 @@ export class ProfileStorage {
 
     this.saveProfile(newProfile);
     return newProfile;
+  }
+
+  /**
+   * Causal Time Invariant:
+   * A user cannot legitimately have studied longer than the physical elapsed time since profile creation.
+   */
+  getMaxPlausibleStudySeconds() {
+    const created = this.profile.createdAt || Date.now();
+    const elapsedSinceCreation = Math.max(0, Math.floor((Date.now() - created) / 1000));
+    // Provide a 2-hour starter window so fresh accounts don't trigger false positives
+    return Math.max(7200, elapsedSinceCreation);
+  }
+
+  /**
+   * Resource Conservation Invariant:
+   * 1 resource is produced every 25 minutes (1,500s) of Pomodoro.
+   * Total items ever produced cannot exceed physical study capacity.
+   */
+  getMaxPlausibleResources() {
+    const verifiedSeconds = Math.min(this.profile.lifetimeSeconds || 0, this.getMaxPlausibleStudySeconds());
+    // Max resources: verified Pomodoros + generous bonus allowance for testing & starter rewards
+    return Math.floor(verifiedSeconds / 1500) + 15;
+  }
+
+  /**
+   * Self-healing audit of local profile counters
+   */
+  healProfileInvariants() {
+    let mutated = false;
+    const maxStudy = this.getMaxPlausibleStudySeconds();
+    if (this.profile.lifetimeSeconds > maxStudy) {
+      console.warn(`[ProfileStorage] Causal violation detected: lifetimeSeconds (${this.profile.lifetimeSeconds}) > maxStudy (${maxStudy}). Auto-healing.`);
+      this.profile.lifetimeSeconds = maxStudy;
+      mutated = true;
+    }
+    const maxItems = this.getMaxPlausibleResources();
+    if (this.profile.itemsProduced > maxItems) {
+      this.profile.itemsProduced = maxItems;
+      mutated = true;
+    }
+    if (mutated) {
+      this.saveProfile();
+    }
+    return mutated;
   }
 
   saveProfile(profileData = null) {

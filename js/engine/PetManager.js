@@ -68,6 +68,7 @@ export class PetManager {
     // CRDT PN-Counter state initialization (Positive / Negative vectors)
     this._pnPantry = this._loadPNPantry();
     this._pantryProxy = this._createPantryProxy();
+    this.healPantryInvariants();
 
     // Biological States: 'AWAKE' | 'ASLEEP'
     if (this.globalExp >= CONFIG.GLOBAL_PROGRESSION.TARGET_EXP_ERA_3) {
@@ -346,8 +347,43 @@ export class PetManager {
       this._pnPantry.produced[itemName] = {};
     }
     const cur = this._pnPantry.produced[itemName][actorId] || 0;
-    this._pnPantry.produced[itemName][actorId] = cur + amount;
+    let nextTotal = cur + amount;
+
+    // Self-healing: if self-producing, ensure we do not exceed plausible verified resources
+    if (actorId === this.nodeId && profileStorage && typeof profileStorage.getMaxPlausibleResources === 'function') {
+      const maxAllowed = profileStorage.getMaxPlausibleResources();
+      if (nextTotal > maxAllowed) {
+        nextTotal = Math.max(cur, maxAllowed);
+      }
+    }
+
+    this._pnPantry.produced[itemName][actorId] = nextTotal;
     this._savePantry();
+  }
+
+  healPantryInvariants() {
+    if (!this._pnPantry || !this._pnPantry.produced) return false;
+    let mutated = false;
+    const items = ['biscuit', 'coffee', 'sponge'];
+    const maxAllowedLocal = profileStorage && typeof profileStorage.getMaxPlausibleResources === 'function'
+      ? profileStorage.getMaxPlausibleResources()
+      : 500;
+
+    for (const item of items) {
+      if (this._pnPantry.produced[item] && this._pnPantry.produced[item][this.nodeId]) {
+        const localCount = this._pnPantry.produced[item][this.nodeId];
+        if (localCount > maxAllowedLocal) {
+          console.warn(`[PetManager] Local pantry discrepancy detected: ${item} (${localCount}) > plausible cap (${maxAllowedLocal}). Auto-healing to legal limit.`);
+          this._pnPantry.produced[item][this.nodeId] = maxAllowedLocal;
+          mutated = true;
+        }
+      }
+    }
+
+    if (mutated) {
+      this._savePantry();
+    }
+    return mutated;
   }
 
   consumePantryItem(itemName, qty = 1, actorId = this.nodeId) {

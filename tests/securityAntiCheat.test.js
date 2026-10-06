@@ -132,3 +132,43 @@ test('Security - Knowledge Engine: XSS stripping, Sybil vote cap, and queue limi
 
   assert.ok(ke.candidateQueue.length <= 50, `Candidate queue must never exceed 50 items (current: ${ke.candidateQueue.length})`);
 });
+
+test('Security - Causal Invariant: Self-healing detects local tamper and restores sanity', async () => {
+  localStorage.clear();
+  const { profileStorage } = await import('../js/storage/ProfileStorage.js');
+  profileStorage.loadProfile();
+  profileStorage.profile.lifetimeSeconds = 0;
+  profileStorage.profile.itemsProduced = 0;
+  profileStorage.saveProfile();
+
+  const pet = new PetManager();
+
+  // Attacker sets 200 biscuits via DevTools console injection without study
+  pet._pnPantry.produced.biscuit[pet.nodeId] = 200;
+  const healed = pet.healPantryInvariants();
+
+  assert.equal(healed, true, 'Self-healing should detect discrepancy between 0 study time and 200 biscuits');
+  // Clamped to max plausible starter baseline (15)
+  assert.ok(pet.pantry.biscuit <= 15, 'Fabricated biscuits must be auto-healed down to plausible baseline');
+});
+
+test('Security - Proof-of-Study: Legitimate student with 80 hours of study retains all 200 biscuits', async () => {
+  localStorage.clear();
+  const { profileStorage } = await import('../js/storage/ProfileStorage.js');
+  profileStorage.loadProfile();
+
+  // Student studied 80 hours (288,000s) over 2 months (60 days)
+  const twoMonthsAgo = Date.now() - (60 * 24 * 3600 * 1000);
+  profileStorage.profile.createdAt = twoMonthsAgo;
+  profileStorage.profile.lifetimeSeconds = 288000; // ~4800 minutes
+  profileStorage.profile.itemsProduced = 192;
+  profileStorage.saveProfile();
+
+  const pet = new PetManager();
+  // Legitimate production of 190 biscuits
+  pet.producePantryItem('biscuit', 190, pet.nodeId);
+  const healed = pet.healPantryInvariants();
+
+  assert.equal(healed, false, 'No healing needed: student has mathematical proof of 80 hours of study');
+  assert.equal(pet.pantry.biscuit, 190, 'Honest student must keep all 190 biscuits without loss');
+});
