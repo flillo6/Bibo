@@ -20,6 +20,7 @@ export class NetworkMesh {
     this.heartbeatIntervalMs = 10000;
     this.heartbeatTimer = null;
     this.lastVitalsSyncTimestamp = 0;
+    this.peerExpHistory = new Map(); // sovereignPeerId -> { lastExp, lastTs }
 
     this.onPeerCountChange = null;
     this.onTopicsSync = null;
@@ -467,61 +468,112 @@ export class NetworkMesh {
   }
 
   _mergeCRDTState(payload, sourceId) {
-    if (!payload) return;
+    if (!payload || typeof payload !== 'object') return;
     let mutated = false;
 
-    // 1. Monotonic EXP Accumulation (G-Counter with persistent storage)
-    if (typeof payload.globalExp === 'number' && payload.globalExp > this.pet.globalExp) {
-      if (typeof this.pet.adoptGlobalExp === 'function') {
-        this.pet.adoptGlobalExp(payload.globalExp);
-      } else {
-        this.pet.globalExp = payload.globalExp;
+    // 1. Monotonic EXP Accumulation with Anti-Cheat & Plausibility Clamping
+    // Honest maximum realistic burst is ~250 EXP (allows multi-hour offline catch-up).
+    // An outright impossible total (>50,000) or massive delta is clamped/throttled.
+    const MAX_ALLOWED_EXP_DELTA = 250;
+    const MAX_PLAUSIBLE_LIFETIME_EXP = 50000;
+
+    if (
+      typeof payload.globalExp === 'number' &&
+      Number.isFinite(payload.globalExp) &&
+      payload.globalExp > this.pet.globalExp &&
+      payload.globalExp <= MAX_PLAUSIBLE_LIFETIME_EXP
+    ) {
+      let allowedExp = payload.globalExp;
+      const rawDelta = payload.globalExp - this.pet.globalExp;
+
+      // Clamp initial burst to MAX_ALLOWED_EXP_DELTA
+      if (rawDelta > MAX_ALLOWED_EXP_DELTA) {
+        allowedExp = this.pet.globalExp + MAX_ALLOWED_EXP_DELTA;
       }
-      mutated = true;
+
+      // Check per-peer streaming rate limit if peer already known
+      const now = Date.now();
+      const peerKey = sourceId || 'anonymous_peer';
+      const history = this.peerExpHistory.get(peerKey);
+      let permitSync = true;
+
+      if (history) {
+        const elapsedSec = Math.max(1, (now - history.lastTs) / 1000);
+        // Realistic max generation rate: ~2 EXP/sec even during burst quizzes/translates
+        const maxAllowedGain = Math.max(25, Math.ceil(elapsedSec * 2));
+        if (allowedExp - history.lastExp > maxAllowedGain) {
+          // Throttled: allow only up to maxAllowedGain from this peer
+          allowedExp = Math.min(allowedExp, history.lastExp + maxAllowedGain);
+          if (allowedExp <= this.pet.globalExp) {
+            permitSync = false;
+          }
+        }
+      }
+
+      if (permitSync && allowedExp > this.pet.globalExp) {
+        this.peerExpHistory.set(peerKey, { lastExp: allowedExp, lastTs: now });
+        if (typeof this.pet.adoptGlobalExp === 'function') {
+          this.pet.adoptGlobalExp(allowedExp);
+        } else {
+          this.pet.globalExp = allowedExp;
+        }
+        mutated = true;
+      }
     }
 
     // 2. Pantry stock (True PN-Counter CRDT merge)
     if (payload.pantryCRDT && typeof this.pet.mergePantryCRDT === 'function') {
       const changed = this.pet.mergePantryCRDT(payload.pantryCRDT);
       if (changed) mutated = true;
-    } else if (payload.pantry) {
-      // Legacy scalar compatibility fallback
+    } else if (payload.pantry && typeof payload.pantry === 'object') {
+      // Legacy scalar compatibility fallback with burst cap
+      const MAX_PRODUCTION_BURST = 15;
       const p = payload.pantry;
-      const b = Math.max(0, Number(p.biscuit) || 0);
-      const c = Math.max(0, Number(p.coffee) || 0);
-      const s = Math.max(0, Number(p.sponge) || 0);
+      const b = Math.max(0, Math.floor(Number(p.biscuit) || 0));
+      const c = Math.max(0, Math.floor(Number(p.coffee) || 0));
+      const s = Math.max(0, Math.floor(Number(p.sponge) || 0));
       const curB = this.pet.pantry.biscuit;
       const curC = this.pet.pantry.coffee;
       const curS = this.pet.pantry.sponge;
 
       if (b > curB) {
+        const deltaB = Math.min(b - curB, MAX_PRODUCTION_BURST);
         if (typeof this.pet.producePantryItem === 'function') {
-          this.pet.producePantryItem('biscuit', b - curB, sourceId || 'legacy_peer');
+          this.pet.producePantryItem('biscuit', deltaB, sourceId || 'legacy_peer');
         } else {
-          this.pet.pantry.biscuit = b;
+          this.pet.pantry.biscuit = curB + deltaB;
         }
         mutated = true;
       }
       if (c > curC) {
+        const deltaC = Math.min(c - curC, MAX_PRODUCTION_BURST);
         if (typeof this.pet.producePantryItem === 'function') {
-          this.pet.producePantryItem('coffee', c - curC, sourceId || 'legacy_peer');
+          this.pet.producePantryItem('coffee', deltaC, sourceId || 'legacy_peer');
         } else {
-          this.pet.pantry.coffee = c;
+          this.pet.pantry.coffee = curC + deltaC;
         }
         mutated = true;
       }
       if (s > curS) {
+        const deltaS = Math.min(s - curS, MAX_PRODUCTION_BURST);
         if (typeof this.pet.producePantryItem === 'function') {
-          this.pet.producePantryItem('sponge', s - curS, sourceId || 'legacy_peer');
+          this.pet.producePantryItem('sponge', deltaS, sourceId || 'legacy_peer');
         } else {
-          this.pet.pantry.sponge = s;
+          this.pet.pantry.sponge = curS + deltaS;
         }
         mutated = true;
       }
     }
 
     // 3. Vitals & State (Collective consensus via adoptRemoteState)
-    if (payload.timestamp) {
+    // Anti-Cheat: Reject future timestamps (>60s clock drift)
+    const MAX_FUTURE_DRIFT_MS = 60 * 1000;
+    if (
+      payload.timestamp &&
+      typeof payload.timestamp === 'number' &&
+      Number.isFinite(payload.timestamp) &&
+      payload.timestamp <= Date.now() + MAX_FUTURE_DRIFT_MS
+    ) {
       if (typeof this.pet.adoptRemoteState === 'function') {
         const adopted = this.pet.adoptRemoteState(payload);
         if (adopted) {
@@ -529,18 +581,38 @@ export class NetworkMesh {
           mutated = true;
         }
       } else if (payload.timestamp > (this.lastVitalsSyncTimestamp || 0)) {
-        if (typeof payload.hunger === 'number') this.pet.hunger = Math.max(0, Math.min(100, payload.hunger));
-        if (typeof payload.energy === 'number') this.pet.energy = Math.max(0, Math.min(100, payload.energy));
-        if (typeof payload.cleanliness === 'number') this.pet.cleanliness = Math.max(0, Math.min(100, payload.cleanliness));
-        if (payload.state) this.pet.state = payload.state;
+        if (typeof payload.hunger === 'number' && Number.isFinite(payload.hunger)) {
+          this.pet.hunger = Math.max(0, Math.min(100, payload.hunger));
+        }
+        if (typeof payload.energy === 'number' && Number.isFinite(payload.energy)) {
+          this.pet.energy = Math.max(0, Math.min(100, payload.energy));
+        }
+        if (typeof payload.cleanliness === 'number' && Number.isFinite(payload.cleanliness)) {
+          this.pet.cleanliness = Math.max(0, Math.min(100, payload.cleanliness));
+        }
+        if (payload.state && ['AWAKE', 'ASLEEP'].includes(payload.state)) {
+          this.pet.state = payload.state;
+        }
         this.lastVitalsSyncTimestamp = payload.timestamp;
         mutated = true;
       }
     }
 
-    // 4. Custom topics synchronization
+    // 4. Custom topics synchronization with sanitization & length limits
     if (Array.isArray(payload.customTopics) && this.onTopicsSync) {
-      this.onTopicsSync(payload.customTopics, sourceId);
+      const sanitized = payload.customTopics
+        .slice(0, 20) // Cap to 20 topics max per sync
+        .filter(t => typeof t === 'string')
+        .map(t => t
+          .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+          .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+          .replace(/<[^>]*>?/gm, '')
+          .trim()
+          .substring(0, 40)) // Strip HTML/scripts, max 40 chars
+        .filter(t => t.length > 0);
+      if (sanitized.length > 0) {
+        this.onTopicsSync(sanitized, sourceId);
+      }
     }
 
     if (mutated) {

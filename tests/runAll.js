@@ -9,3 +9,4 @@ import './KnowledgeEngine.test.js';
 import './StudyTimer.test.js';
 import './ProfileStorage.test.js';
 import './NetworkMesh.test.js';
+import './securityAntiCheat.test.js';

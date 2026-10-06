@@ -396,8 +396,9 @@ export class KnowledgeEngine {
     }
     const votesMap = this.voterRegistry.get(notionId);
 
-    // 1 weight per 15 minutes of verified study, bounded [1, 100]
-    const weight = Math.max(1, Math.min(100, Math.floor((studyMinutes || 0) / 15)));
+    // Anti-Sybil / Anti-Cheat: Cap individual voter weight between [1, 3] points
+    // Regardless of claimed study minutes, no single peer can unilaterally force consensus.
+    const weight = Math.max(1, Math.min(3, Math.floor((studyMinutes || 0) / 15)));
     votesMap.set(voterKey, { vote, weight });
 
     let totalWeightTrue = 0;
@@ -419,6 +420,16 @@ export class KnowledgeEngine {
         this._saveCandidateQueue();
       }
     }
+  }
+
+  _sanitizeString(str, maxLength = 300) {
+    if (typeof str !== 'string') return '';
+    return str
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+      .replace(/<[^>]*>?/gm, '')
+      .trim()
+      .substring(0, maxLength);
   }
 
   /**
@@ -459,16 +470,24 @@ export class KnowledgeEngine {
    */
   submitNotion(topic, question, answer, lang = (i18n ? i18n.locale : 'it')) {
     if (!question || !answer) return;
+    if (this.candidateQueue.length >= 50) {
+      console.warn('[KnowledgeEngine] Candidate queue is full (50 items max).');
+      return;
+    }
+
+    const qClean = this._sanitizeString(question, 300);
+    const aClean = this._sanitizeString(answer, 200);
+    const cleanTopic = this._sanitizeString(topic, 40) || (lang === 'en' ? 'General' : 'Generale');
+    if (qClean.length < 5 || aClean.length < 1) return;
 
     const newId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    const cleanTopic = topic ? topic.trim() : (lang === 'en' ? 'General' : 'Generale');
 
     this.candidateQueue.push({
       id: newId,
       topic: cleanTopic,
-      question: question.trim(),
-      answer: answer.trim(),
-      lang,
+      question: qClean,
+      answer: aClean,
+      lang: lang === 'en' ? 'en' : 'it',
       votesTrue: 1, // Author's implicit vote
       votesFalse: 0,
       flags: 0
@@ -483,7 +502,18 @@ export class KnowledgeEngine {
    */
   addRemoteCandidate(notion) {
     if (!notion || !notion.question || !notion.answer) return;
-    const qClean = notion.question.trim();
+    if (this.candidateQueue.length >= 50) {
+      console.warn('[KnowledgeEngine] Candidate queue is full (50 items max). Discarding remote notion.');
+      return;
+    }
+
+    const qClean = this._sanitizeString(notion.question, 300);
+    const aClean = this._sanitizeString(notion.answer, 200);
+    const cleanTopic = this._sanitizeString(notion.topic, 40) || 'Generale';
+    const lang = (notion.lang === 'en') ? 'en' : 'it';
+
+    if (qClean.length < 5 || aClean.length < 1) return;
+
     // Prevent duplicate entries
     const exists = this.candidateQueue.some(c => {
       const q = typeof c.question === 'object' ? (c.question.it || c.question.en || '') : (c.question || '');
@@ -491,19 +521,22 @@ export class KnowledgeEngine {
     });
     if (exists) return;
 
-    const newId = notion.id || `remote_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const newId = (typeof notion.id === 'string' && notion.id.length <= 64)
+      ? notion.id
+      : `remote_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
     this.candidateQueue.push({
       id: newId,
-      topic: notion.topic ? notion.topic.trim() : 'Generale',
+      topic: cleanTopic,
       question: qClean,
-      answer: notion.answer.trim(),
-      lang: notion.lang || 'it',
+      answer: aClean,
+      lang,
       votesTrue: 1,
       votesFalse: 0,
       flags: 0
     });
     this._saveCandidateQueue();
-    console.log(`[KnowledgeEngine] Ingested remote candidate for topic "${notion.topic}".`);
+    console.log(`[KnowledgeEngine] Ingested remote candidate for topic "${cleanTopic}".`);
   }
 
   _promoteCandidate(cand) {

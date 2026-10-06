@@ -95,7 +95,7 @@ class BiboApp {
         if (typeof t === 'string' && t.trim()) {
           const clean = t.trim();
           if (!this.profile.customTopics) this.profile.customTopics = [];
-          if (!this.profile.customTopics.includes(clean)) {
+          if (!this.profile.customTopics.includes(clean) && this.profile.customTopics.length < 50) {
             this.profile.customTopics.push(clean);
             added = true;
           }

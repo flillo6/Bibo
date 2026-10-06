@@ -372,8 +372,10 @@ export class PetManager {
     if (!remoteCRDT || typeof remoteCRDT !== 'object') return false;
     let mutated = false;
     const items = ['biscuit', 'coffee', 'sponge'];
+    const MAX_PRODUCTION_BURST = 15;
+    const MAX_PER_ACTOR_TOTAL = 500;
 
-    // 1. Pointwise maximum for Produced vector (G-Counter)
+    // 1. Pointwise maximum for Produced vector (G-Counter) with anti-inflation clamp
     if (remoteCRDT.produced && typeof remoteCRDT.produced === 'object') {
       for (const item of items) {
         const remoteActors = remoteCRDT.produced[item];
@@ -381,12 +383,17 @@ export class PetManager {
           if (!this._pnPantry.produced[item]) this._pnPantry.produced[item] = {};
           for (const [actor, count] of Object.entries(remoteActors)) {
             if (typeof actor === 'string' && actor.length > 0 && actor.length <= 64) {
-              const num = Math.floor(Number(count) || 0);
-              if (num > 0) {
+              const rawNum = Math.floor(Number(count) || 0);
+              if (rawNum > 0) {
                 const localCount = this._pnPantry.produced[item][actor] || 0;
-                if (num > localCount) {
-                  this._pnPantry.produced[item][actor] = num;
-                  mutated = true;
+                if (rawNum > localCount) {
+                  // Anti-cheat: Clamp incremental jump to MAX_PRODUCTION_BURST per sync
+                  const clampedJump = Math.min(rawNum - localCount, MAX_PRODUCTION_BURST);
+                  const safeTotal = Math.min(localCount + clampedJump, MAX_PER_ACTOR_TOTAL);
+                  if (safeTotal > localCount) {
+                    this._pnPantry.produced[item][actor] = safeTotal;
+                    mutated = true;
+                  }
                 }
               }
             }
@@ -458,12 +465,26 @@ export class PetManager {
       : (typeof remote.timestamp === 'number' ? remote.timestamp : 0);
     const localActionTs = this.lastActionTimestamp || 0;
 
+    // Anti-Cheat: Reject future timestamps (Time-Travel attack prevention, max 60s clock drift)
+    const MAX_CLOCK_DRIFT_MS = 60 * 1000;
+    if (!Number.isFinite(remoteActionTs) || remoteActionTs <= 0 || remoteActionTs > Date.now() + MAX_CLOCK_DRIFT_MS) {
+      return false;
+    }
+
     // A. Remote has a fresher user care interaction: remote is authoritative!
     if (remoteActionTs > localActionTs) {
-      if (typeof remote.hunger === 'number') this.hunger = Math.max(0, Math.min(100, remote.hunger));
-      if (typeof remote.energy === 'number') this.energy = Math.max(0, Math.min(100, remote.energy));
-      if (typeof remote.cleanliness === 'number') this.cleanliness = Math.max(0, Math.min(100, remote.cleanliness));
-      if (remote.state) this.state = remote.state;
+      if (typeof remote.hunger === 'number' && Number.isFinite(remote.hunger)) {
+        this.hunger = Math.max(0, Math.min(100, remote.hunger));
+      }
+      if (typeof remote.energy === 'number' && Number.isFinite(remote.energy)) {
+        this.energy = Math.max(0, Math.min(100, remote.energy));
+      }
+      if (typeof remote.cleanliness === 'number' && Number.isFinite(remote.cleanliness)) {
+        this.cleanliness = Math.max(0, Math.min(100, remote.cleanliness));
+      }
+      if (remote.state && ['AWAKE', 'ASLEEP'].includes(remote.state)) {
+        this.state = remote.state;
+      }
       this.lastActionTimestamp = remoteActionTs;
 
       // Apply decay strictly from the remote action timestamp to now
