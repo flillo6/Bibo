@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://flillo6.github.io/Bibo/sitemap.xml
+Sitemap: https://bibostudy.com/sitemap.xml
