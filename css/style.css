@@ -8,8 +8,30 @@
  * - 15 FPS discrete feel
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+/* Self-Hosted Sovereign Space Mono Fonts (100% Offline & Zero External Network Requests) */
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/SpaceMono-normal-400.woff2') format('woff2');
+}
 
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../assets/fonts/SpaceMono-normal-700.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Space Mono';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/SpaceMono-italic-400.woff2') format('woff2');
+}
 /* Color Variables */
 :root {
   /* Dynamic Viewport & Safe Area Dimensions */
