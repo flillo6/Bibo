@@ -269,5 +269,18 @@ test('NetworkMesh - PN-Counter CRDT converges under concurrent multi-peer consum
   assert.equal(peerC.pantry.biscuit, 4, 'Peer C should converge to 4 biscuits');
 });
 
+test('NetworkMesh - Multi-transport architecture and clean lifecycle destroy', () => {
+  const pet = new PetManager();
+  const mesh = new NetworkMesh(pet);
 
+  assert.equal(mesh.roomMqtt, null);
+  assert.equal(mesh.roomTorrent, null);
+  assert.equal(mesh.roomNostr, null);
+  assert.equal(mesh.peerCount, 1);
 
+  // Calling destroy cleans up timers, sockets, and local channels
+  mesh.destroy();
+  assert.equal(mesh._isDestroyed, true);
+  assert.equal(mesh.heartbeatTimer, null);
+  assert.equal(mesh.nostrSockets.length, 0);
+});
