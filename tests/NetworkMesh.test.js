@@ -284,3 +284,66 @@ test('NetworkMesh - Multi-transport architecture and clean lifecycle destroy', (
   assert.equal(mesh.heartbeatTimer, null);
   assert.equal(mesh.nostrSockets.length, 0);
 });
+
+test('NetworkMesh - Converges vitals across 3 devices (Friend Phone, User Phone, PC)', () => {
+  localStorage.clear();
+  // 1. Friend Phone joins for the first time: default 80% hunger, 0 action ts
+  const friendPet = new PetManager();
+  friendPet.hunger = 80;
+  friendPet.lastActionTimestamp = 0;
+  const friendMesh = new NetworkMesh(friendPet);
+
+  // 2. User Phone was offline for a while: decayed to 25% hunger, 0 action ts
+  const userPhonePet = new PetManager();
+  userPhonePet.hunger = 25;
+  userPhonePet.lastActionTimestamp = 0;
+  const userPhoneMesh = new NetworkMesh(userPhonePet);
+
+  // 3. User PC was open: 45% hunger, 0 action ts
+  const pcPet = new PetManager();
+  pcPet.hunger = 45;
+  pcPet.lastActionTimestamp = 0;
+  const pcMesh = new NetworkMesh(pcPet);
+
+  // Synchronize User Phone state to Friend and PC
+  const phonePayload = {
+    senderId: 'user_phone',
+    hunger: userPhonePet.hunger,
+    energy: userPhonePet.energy,
+    cleanliness: userPhonePet.cleanliness,
+    lastActionTimestamp: 0,
+    timestamp: Date.now()
+  };
+  friendMesh._handleIncomingMessage({ type: 'STATE_SYNC', payload: phonePayload }, 'user_phone');
+  pcMesh._handleIncomingMessage({ type: 'STATE_SYNC', payload: phonePayload }, 'user_phone');
+
+  // Both Friend and PC must converge down to the decayed companion state (25%)
+  assert.equal(friendPet.hunger, 25, 'Friend phone should align to decayed companion vitals');
+  assert.equal(pcPet.hunger, 25, 'PC should align to decayed companion vitals');
+  assert.equal(userPhonePet.hunger, 25, 'User phone stays at 25%');
+
+  // 4. Friend feeds Bibo (+25% hunger to 50%)
+  const now = Date.now();
+  friendPet.producePantryItem('biscuit', 2, 'friend');
+  friendPet.feedBiscuit();
+  assert.equal(friendPet.hunger, 50, 'Friend pet hunger increases to 50');
+  assert.ok(friendPet.lastActionTimestamp >= now, 'Action timestamp updated');
+
+  // Friend broadcasts action to User Phone and PC
+  const feedPayload = {
+    senderId: 'friend',
+    hunger: friendPet.hunger,
+    energy: friendPet.energy,
+    cleanliness: friendPet.cleanliness,
+    lastActionTimestamp: friendPet.lastActionTimestamp,
+    timestamp: Date.now()
+  };
+  userPhoneMesh._handleIncomingMessage({ type: 'STATE_SYNC', payload: feedPayload }, 'friend');
+  pcMesh._handleIncomingMessage({ type: 'STATE_SYNC', payload: feedPayload }, 'friend');
+
+  // All 3 devices are now 100% identical!
+  assert.equal(userPhonePet.hunger, 50, 'User phone adopts friend feeding (50)');
+  assert.equal(pcPet.hunger, 50, 'PC adopts friend feeding (50)');
+  assert.equal(friendPet.hunger, 50, 'Friend stays at 50');
+});
+

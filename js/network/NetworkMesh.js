@@ -103,6 +103,11 @@ export class NetworkMesh {
 
     this._startHeartbeat();
     console.log('[NetworkMesh] Multi-signaling & Gossip engine initialized.');
+
+    // Actively solicit consensus state from all online peers
+    setTimeout(() => {
+      this._emitGossip('REQUEST_SYNC', { senderId: this.localPeerId });
+    }, 400);
   }
 
   async _initNostrBus(relays) {
@@ -161,6 +166,7 @@ export class NetworkMesh {
           '#x': [this.nostrTopic]
         }]));
         this.broadcastState();
+        this._emitGossip('REQUEST_SYNC', { senderId: this.localPeerId });
       };
       ws.onmessage = (e) => {
         try {
@@ -419,9 +425,22 @@ export class NetworkMesh {
         this.broadcastState();
         break;
       case 'STATE_SYNC':
-      case 'BIBO_P2P_SYNC':
-        this._mergeCRDTState(packet.payload, actualSender);
+      case 'BIBO_P2P_SYNC': {
+        const mutated = this._mergeCRDTState(packet.payload, actualSender);
+        // Bi-directional convergence: if we possess fresher care action or higher EXP,
+        // reply so the sender converges immediately to the authoritative collective state!
+        const remoteActionTs = (packet.payload && packet.payload.lastActionTimestamp) || 0;
+        const localActionTs = this.pet.lastActionTimestamp || 0;
+        const remoteExp = (packet.payload && packet.payload.globalExp) || 0;
+        const localExp = this.pet.globalExp || 0;
+        if (!mutated && (localActionTs > remoteActionTs || localExp > remoteExp)) {
+          if (!this._lastSyncReply || Date.now() - this._lastSyncReply > 2000) {
+            this._lastSyncReply = Date.now();
+            setTimeout(() => this.broadcastState(), 250);
+          }
+        }
         break;
+      }
       case 'NOTION_BROADCAST':
       case 'BIBO_P2P_NOTION':
         if (this.onNotionSync) this.onNotionSync(packet.payload, actualSender);
@@ -642,6 +661,7 @@ export class NetworkMesh {
       this.pet._updateAnimationState();
       this.pet._notify(false);
     }
+    return mutated;
   }
 
   _handleLocalBroadcast(e) {

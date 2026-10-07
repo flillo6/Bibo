@@ -496,14 +496,26 @@ export class PetManager {
    */
   adoptRemoteState(remote) {
     if (!remote || typeof remote !== 'object') return false;
-    const remoteActionTs = typeof remote.lastActionTimestamp === 'number'
-      ? remote.lastActionTimestamp
-      : (typeof remote.timestamp === 'number' ? remote.timestamp : 0);
-    const localActionTs = this.lastActionTimestamp || 0;
+
+    let remoteActionTs = 0;
+    if (typeof remote.lastActionTimestamp === 'number' && Number.isFinite(remote.lastActionTimestamp)) {
+      remoteActionTs = remote.lastActionTimestamp;
+    } else if (typeof remote.timestamp === 'number' && Number.isFinite(remote.timestamp)) {
+      remoteActionTs = remote.timestamp;
+    }
+
+    const localActionTs = (typeof this.lastActionTimestamp === 'number' && Number.isFinite(this.lastActionTimestamp))
+      ? this.lastActionTimestamp
+      : 0;
+
+    const remoteTs = (typeof remote.timestamp === 'number' && Number.isFinite(remote.timestamp))
+      ? remote.timestamp
+      : 0;
 
     // Anti-Cheat: Reject future timestamps (Time-Travel attack prevention, max 60s clock drift)
     const MAX_CLOCK_DRIFT_MS = 60 * 1000;
-    if (!Number.isFinite(remoteActionTs) || remoteActionTs <= 0 || remoteActionTs > Date.now() + MAX_CLOCK_DRIFT_MS) {
+    const maxAllowedTs = Date.now() + MAX_CLOCK_DRIFT_MS;
+    if (remoteActionTs > maxAllowedTs || remoteTs > maxAllowedTs) {
       return false;
     }
 
@@ -531,20 +543,24 @@ export class PetManager {
       return true;
     }
 
-    // B. Both have equal action timestamps (e.g. neither has interacted since boot):
+    // B. Both have equal action timestamps (e.g. neither has interacted since boot, or both are 0):
     // Align with the peer with lower vitals (older/more decayed companion) to prevent divergence
     if (remoteActionTs === localActionTs) {
       let changed = false;
-      if (typeof remote.hunger === 'number' && remote.hunger < this.hunger) {
-        this.hunger = remote.hunger;
+      if (typeof remote.hunger === 'number' && Number.isFinite(remote.hunger) && remote.hunger < this.hunger) {
+        this.hunger = Math.max(0, Math.min(100, remote.hunger));
         changed = true;
       }
-      if (typeof remote.cleanliness === 'number' && remote.cleanliness < this.cleanliness) {
-        this.cleanliness = remote.cleanliness;
+      if (typeof remote.cleanliness === 'number' && Number.isFinite(remote.cleanliness) && remote.cleanliness < this.cleanliness) {
+        this.cleanliness = Math.max(0, Math.min(100, remote.cleanliness));
         changed = true;
       }
-      if (typeof remote.energy === 'number' && remote.energy < this.energy) {
-        this.energy = remote.energy;
+      if (typeof remote.energy === 'number' && Number.isFinite(remote.energy) && remote.energy < this.energy) {
+        this.energy = Math.max(0, Math.min(100, remote.energy));
+        changed = true;
+      }
+      if (remote.state && ['AWAKE', 'ASLEEP'].includes(remote.state) && this.state !== remote.state && remote.energy < 20) {
+        this.state = remote.state;
         changed = true;
       }
       if (changed) {
