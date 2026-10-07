@@ -8,18 +8,18 @@
  * - Native iOS & Android PWA live revalidation
  */
 
-const CACHE_NAME = 'bibo-pwa-v7.2';
+const CACHE_NAME = 'bibo-pwa-v7.3';
 
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './css/style.css?v=7.2',
+  './css/style.css?v=7.3',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
   './js/config.js',
   './js/i18n.js',
-  './js/app.js?v=7.2',
+  './js/app.js?v=7.3',
   './js/audio/AudioSynthesizer.js',
   './js/engine/SpriteAnimation.js',
   './js/engine/PetManager.js',
@@ -31,7 +31,6 @@ const STATIC_ASSETS = [
   './js/storage/ProfileStorage.js',
   './js/storage/SovereignCrypto.js',
   './js/vendor/trystero-mqtt.js',
-  './js/vendor/trystero-torrent.js',
   './js/vendor/trystero-nostr.js',
   // Baby sprites
   './assets/sprites/baby/idle_base.png',

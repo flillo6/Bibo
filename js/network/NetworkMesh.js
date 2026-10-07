@@ -71,33 +71,24 @@ export class NetworkMesh {
       iceCandidatePoolSize: 4
     };
 
-    // 1. MQTT Public Brokers: 100% adblocker-proof & enterprise firewall resistant
+    // 1. MQTT Public Brokers: standard WSS ports, 100% adblocker-proof & firewall resistant
     const mqttBrokers = [
       'wss://public:public@public.cloud.shiftr.io',
-      'wss://broker.hivemq.com:8884/mqtt'
+      'wss://broker.emqx.io:8084/mqtt'
     ];
 
-    // 2. High-uptime Tier-1 Nostr Relays: sub-400ms global latency
+    // 2. High-uptime Tier-1 Nostr Relays: sub-400ms global latency (Damus excluded due to aggressive rate-limits)
     const nostrRelays = [
       'wss://nos.lol',
-      'wss://relay.damus.io',
       'wss://nostr.mom',
       'wss://relay.primal.net',
-      'wss://bucket.coracle.social',
-      'wss://purplerelay.com'
-    ];
-
-    // 3. WebTorrent Trackers: complementary fallback for open networks
-    const torrentRelays = [
-      'wss://tracker.openwebtorrent.com',
-      'wss://tracker.webtorrent.dev',
-      'wss://open.ftorrent.com'
+      'wss://purplerelay.com',
+      'wss://bucket.coracle.social'
     ];
 
     await Promise.allSettled([
       this._initStrategy('mqtt', '../vendor/trystero-mqtt.js', mqttBrokers, rtcConfig),
       this._initStrategy('nostr', '../vendor/trystero-nostr.js', nostrRelays, rtcConfig),
-      this._initStrategy('torrent', '../vendor/trystero-torrent.js', torrentRelays, rtcConfig),
       this._initNostrBus(nostrRelays)
     ]);
 
@@ -184,8 +175,10 @@ export class NetworkMesh {
           const failures = (this.nostrFailureCounts.get(url) || 0) + 1;
           this.nostrFailureCounts.set(url, failures);
 
-          // Exponential backoff: 5s, 15s, 30s, up to 120s max. Prevents hammering failing relays.
-          const backoffMs = Math.min(120000, Math.pow(2, Math.min(failures, 5)) * 3000 + Math.random() * 2000);
+          // If a relay continuously fails 3+ times, put it in a 5-minute cool-down to keep console 100% clean
+          const backoffMs = failures >= 3
+            ? 300000 // 5 minutes cool-down
+            : Math.pow(2, failures) * 4000 + Math.random() * 2000;
 
           if (!this.nostrRetryTimers.has(url)) {
             const timer = setTimeout(() => {
@@ -358,7 +351,7 @@ export class NetworkMesh {
     }
   }
 
-  _dispatchToOverlay(packet) {
+  _dispatchToOverlay(packet, includeNostrBus = true) {
     // 1. Direct WebRTC DataChannels (if P2P hole-punch succeeded across any transport)
     if (this.roomMqtt && this.roomMqtt._rawSend) {
       try { this.roomMqtt._rawSend(packet); } catch (_) {}
@@ -370,8 +363,11 @@ export class NetworkMesh {
       try { this.roomNostr._rawSend(packet); } catch (_) {}
     }
 
-    // 2. Sovereign Decentralized Nostr WebSocket Bus (100% NAT-proof delivery across all carriers & devices)
-    if (this.nostrCreateEvent && this.nostrSockets && this.nostrSockets.length > 0) {
+    // 2. Sovereign Decentralized Nostr WebSocket Bus:
+    // CRITICAL FOR SCALE & RATE LIMITS: Only broadcast locally-generated events to the Nostr Bus!
+    // Never re-publish forwarded/relayed packets (ttl > 1) back to Nostr, because Nostr is already a star topology
+    // where the relay fans out to all subscribers in 1 hop. Re-broadcasting would create an O(N^2) exponential flood.
+    if (includeNostrBus && this.nostrCreateEvent && this.nostrSockets && this.nostrSockets.length > 0) {
       this.nostrCreateEvent(this.nostrTopic, JSON.stringify(packet)).then((eventJson) => {
         for (const ws of this.nostrSockets) {
           if (ws && ws.readyState === 1) { // 1 = OPEN
@@ -452,7 +448,8 @@ export class NetworkMesh {
 
     if (packet.ttl && packet.ttl > 1) {
       const relayPacket = { ...packet, ttl: packet.ttl - 1 };
-      this._dispatchToOverlay(relayPacket);
+      // Forward only across WebRTC DataChannels, NEVER re-publish to Nostr Bus
+      this._dispatchToOverlay(relayPacket, false);
     }
   }
 
