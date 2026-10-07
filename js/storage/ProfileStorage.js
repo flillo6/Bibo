@@ -35,6 +35,9 @@ export class ProfileStorage {
         if (!loaded.createdAt || typeof loaded.createdAt !== 'number') {
           loaded.createdAt = Date.now() - 3600000; // 1 hour grace baseline
         }
+        if (loaded.progressBiscuitSeconds === undefined) loaded.progressBiscuitSeconds = 0;
+        if (loaded.progressCoffeeSeconds === undefined) loaded.progressCoffeeSeconds = 0;
+        if (loaded.progressSpongeSeconds === undefined) loaded.progressSpongeSeconds = 0;
         return loaded;
       } catch (e) {
         console.error('Error parsing profile, regenerating:', e);
@@ -60,6 +63,9 @@ export class ProfileStorage {
       lastStudyDate: new Date().toISOString().split('T')[0],
       itemsProduced: 0,
       reviewsCompleted: 0,
+      progressBiscuitSeconds: 0,
+      progressCoffeeSeconds: 0,
+      progressSpongeSeconds: 0,
       theme: 'warm_paper',
       onboardingComplete: false,
       biboLevel: 1,
@@ -83,13 +89,13 @@ export class ProfileStorage {
 
   /**
    * Resource Conservation Invariant:
-   * 1 resource is produced every 25 minutes (1,500s) of Pomodoro.
    * Total items ever produced cannot exceed physical study capacity.
+   * Biscuit (~25m), Coffee (~30m), Sponge (~50m).
    */
   getMaxPlausibleResources() {
     const verifiedSeconds = Math.min(this.profile.lifetimeSeconds || 0, this.getMaxPlausibleStudySeconds());
-    // Max resources: verified Pomodoros + generous bonus allowance for testing & starter rewards
-    return Math.floor(verifiedSeconds / 1500) + 15;
+    // Max resources: verified study items + starter reward allowance
+    return Math.floor(verifiedSeconds / 900) + 15;
   }
 
   /**
@@ -137,11 +143,26 @@ export class ProfileStorage {
   }
 
   /**
-   * Records completed study session and updates streak
+   * Records completed study session, updates streak and saves modular progress counters
    */
-  recordSession(elapsedSeconds, itemsEarned = 0) {
+  recordSession(elapsedSeconds, itemsEarned = 0, progressState = null) {
     this.profile.lifetimeSeconds += elapsedSeconds;
-    this.profile.itemsProduced += itemsEarned;
+    const count = typeof itemsEarned === 'object' && itemsEarned !== null
+      ? (itemsEarned.total || (itemsEarned.biscuit || 0) + (itemsEarned.coffee || 0) + (itemsEarned.sponge || 0))
+      : Number(itemsEarned) || 0;
+    this.profile.itemsProduced += count;
+
+    if (progressState && typeof progressState === 'object') {
+      if (typeof progressState.progressBiscuitSeconds === 'number') {
+        this.profile.progressBiscuitSeconds = progressState.progressBiscuitSeconds;
+      }
+      if (typeof progressState.progressCoffeeSeconds === 'number') {
+        this.profile.progressCoffeeSeconds = progressState.progressCoffeeSeconds;
+      }
+      if (typeof progressState.progressSpongeSeconds === 'number') {
+        this.profile.progressSpongeSeconds = progressState.progressSpongeSeconds;
+      }
+    }
 
     const today = new Date().toISOString().split('T')[0];
     if (this.profile.lastStudyDate !== today) {

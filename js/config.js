@@ -100,8 +100,12 @@ export const CONFIG = {
     MIN_SESSION_MINUTES: 5,
     MAX_SESSION_MINUTES: 180,
     DEFAULT_DURATION_MINUTES: 25,
-    // Real study time required to unlock 1 pantry resource choice (in minutes)
-    MINUTES_PER_RESOURCE: 15
+    // Real cumulative study minutes required to produce resources
+    MINUTES_PER_BISCUIT: 25,  // +1 Biscuit every 25 min (1 Pomodoro)
+    MINUTES_PER_COFFEE: 30,   // +1 Coffee every 30 min
+    MINUTES_PER_SPONGE: 50,   // +1 Sponge every 50 min (2 Pomodoros or 1 Deep Work block)
+    // Legacy alias
+    MINUTES_PER_RESOURCE: 25
   },
 
   // Color Palettes

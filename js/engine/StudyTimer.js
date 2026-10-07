@@ -39,6 +39,22 @@ export class StudyTimer {
     // Cumulative verified study seconds across lifetime
     this.lifetimeStudySeconds = 0;
     this.unclaimedResourceProgressSeconds = 0;
+
+    // Modular cumulative progress counters (seconds toward next item)
+    this.progressBiscuitSeconds = 0;
+    this.progressCoffeeSeconds = 0;
+    this.progressSpongeSeconds = 0;
+  }
+
+  /**
+   * Initializes cumulative progress counters from persistent profile
+   */
+  initProgress(profile) {
+    if (!profile) return;
+    this.lifetimeStudySeconds = profile.lifetimeSeconds || 0;
+    this.progressBiscuitSeconds = profile.progressBiscuitSeconds || 0;
+    this.progressCoffeeSeconds = profile.progressCoffeeSeconds || 0;
+    this.progressSpongeSeconds = profile.progressSpongeSeconds || 0;
   }
 
   setDuration(minutes) {
@@ -103,16 +119,47 @@ export class StudyTimer {
     this.lifetimeStudySeconds += verifiedSeconds;
     this.unclaimedResourceProgressSeconds += verifiedSeconds;
 
-    // Calculate resources earned: 1 resource every CONFIG.STUDY.MINUTES_PER_RESOURCE minutes
-    const resourceTargetSeconds = CONFIG.STUDY.MINUTES_PER_RESOURCE * 60;
-    const resourcesEarned = Math.floor(this.unclaimedResourceProgressSeconds / resourceTargetSeconds);
-    this.unclaimedResourceProgressSeconds %= resourceTargetSeconds;
+    // Calculate resources earned modularly
+    const targetBiscuitSec = (CONFIG.STUDY.MINUTES_PER_BISCUIT || 25) * 60;
+    const targetCoffeeSec = (CONFIG.STUDY.MINUTES_PER_COFFEE || 30) * 60;
+    const targetSpongeSec = (CONFIG.STUDY.MINUTES_PER_SPONGE || 50) * 60;
+
+    this.progressBiscuitSeconds += verifiedSeconds;
+    this.progressCoffeeSeconds += verifiedSeconds;
+    this.progressSpongeSeconds += verifiedSeconds;
+
+    const biscuitsEarned = Math.floor(this.progressBiscuitSeconds / targetBiscuitSec);
+    this.progressBiscuitSeconds %= targetBiscuitSec;
+
+    const coffeeEarned = Math.floor(this.progressCoffeeSeconds / targetCoffeeSec);
+    this.progressCoffeeSeconds %= targetCoffeeSec;
+
+    const spongesEarned = Math.floor(this.progressSpongeSeconds / targetSpongeSec);
+    this.progressSpongeSeconds %= targetSpongeSec;
+
+    const totalEarned = biscuitsEarned + coffeeEarned + spongesEarned;
+
+    // Legacy fallback
+    const legacyTargetSeconds = (CONFIG.STUDY.MINUTES_PER_RESOURCE || 25) * 60;
+    const resourcesEarned = Math.floor(this.unclaimedResourceProgressSeconds / legacyTargetSeconds);
+    this.unclaimedResourceProgressSeconds %= legacyTargetSeconds;
 
     const summary = {
       verifiedSeconds,
       verifiedMinutes: Math.floor(verifiedSeconds / 60),
       totalLifetimeSeconds: this.lifetimeStudySeconds,
-      resourcesEarned,
+      resourcesEarned: biscuitsEarned, // backwards compatible with code reading .resourcesEarned
+      earnedItems: {
+        biscuit: biscuitsEarned,
+        coffee: coffeeEarned,
+        sponge: spongesEarned,
+        total: totalEarned
+      },
+      progressState: {
+        progressBiscuitSeconds: this.progressBiscuitSeconds,
+        progressCoffeeSeconds: this.progressCoffeeSeconds,
+        progressSpongeSeconds: this.progressSpongeSeconds
+      },
       formattedTime: this.formatSeconds(verifiedSeconds),
       proof: this.lastProof || 'local_verified'
     };

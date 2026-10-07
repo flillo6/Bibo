@@ -52,6 +52,11 @@ class BiboApp {
   async init() {
     console.log(`[BIBO] Initializing ${CONFIG.APP_NAME} v${CONFIG.VERSION}...`);
 
+    // 0. Initialize cumulative timer progress from profile
+    if (this.timer && typeof this.timer.initProgress === 'function') {
+      this.timer.initProgress(this.profile);
+    }
+
     // 1. Initialize Sprite Engine
     await this.anim.init();
 
@@ -408,8 +413,15 @@ class BiboApp {
     console.log('[Timer] Session finished:', summary);
     audioSynth.playClick();
 
-    // Update profile
-    profileStorage.recordSession(summary.verifiedSeconds, summary.resourcesEarned);
+    const earnedItems = summary.earnedItems || {
+      biscuit: summary.resourcesEarned || 0,
+      coffee: 0,
+      sponge: 0,
+      total: summary.resourcesEarned || 0
+    };
+
+    // Update profile with verified seconds, items, and progress state
+    profileStorage.recordSession(summary.verifiedSeconds, earnedItems, summary.progressState);
 
     // Contribute study minutes to global community pool
     const minsStudied = Math.round(summary.verifiedSeconds / 60);
@@ -418,15 +430,22 @@ class BiboApp {
     this.pet.gainExp(expGained, 'study');
     this._showSpeechBubble(i18n.t('bubble.global_contrib', { exp: expGained, mins: minsStudied }));
 
-    // Give earned resources to pantry
-    if (summary.resourcesEarned > 0) {
-      this.pet.producePantryItem('biscuit', summary.resourcesEarned);
-      if (minsStudied >= 20) {
-        this.pet.producePantryItem('coffee', Math.max(1, Math.floor(summary.resourcesEarned / 2)));
-      }
-      if (minsStudied >= 40) {
-        this.pet.producePantryItem('sponge', 1);
-      }
+    // Give earned resources to shared pantry
+    let pantryChanged = false;
+    if (earnedItems.biscuit > 0) {
+      this.pet.producePantryItem('biscuit', earnedItems.biscuit);
+      pantryChanged = true;
+    }
+    if (earnedItems.coffee > 0) {
+      this.pet.producePantryItem('coffee', earnedItems.coffee);
+      pantryChanged = true;
+    }
+    if (earnedItems.sponge > 0) {
+      this.pet.producePantryItem('sponge', earnedItems.sponge);
+      pantryChanged = true;
+    }
+
+    if (pantryChanged) {
       this.pet._savePantry();
       this.pet._notify(true);
       this._updatePantryButton();

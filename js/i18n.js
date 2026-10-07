@@ -109,7 +109,7 @@ export const DICTIONARY = {
     'pantry.close': '[ CHIUDI DISPENSA ]',
     'pantry.btn.info': '[ ? INFO ]',
     'pantry.info.heading': 'COME FUNZIONA LA DISPENSA:',
-    'pantry.info.p1': '• Produzione Risorse: Ogni sessione di studio reale della community produce automaticamente biscotti, caffè e spugnette per il fondo comune.',
+    'pantry.info.p1': '• Produzione Risorse: Il tempo di studio è cumulativo! Ogni 25 min ottieni +1 Biscotto, ogni 30 min +1 Caffè, e ogni 50 min (es. 2 Pomodori da 25 min) sblocchi +1 Spugnetta.',
     'pantry.info.p2': '• Cura Condivisa: Chiunque nel mondo può usare le scorte per nutrire Bibo, ricaricarlo o pulire il monitor CRT.',
     'pantry.info.p3': '• Sincronizzazione CRDT: Le risorse sono matematicamente sincronizzate via mesh P2P (PN-Counter) a zero conflitti.',
     
@@ -303,7 +303,7 @@ export const DICTIONARY = {
     'pantry.close': '[ CLOSE PANTRY ]',
     'pantry.btn.info': '[ ? INFO ]',
     'pantry.info.heading': 'HOW THE PANTRY WORKS:',
-    'pantry.info.p1': '• Resource Production: Every real study session from the community generates biscuits, coffee, and sponges for the shared pool.',
+    'pantry.info.p1': '• Resource Production: Study time is cumulative! Every 25 min yields +1 Biscuit, every 30 min +1 Coffee, and every 50 min (e.g. two 25-min Pomodoros) unlocks +1 Sponge.',
     'pantry.info.p2': '• Shared Care: Anyone in the world can use these supplies to feed Bibo, restore his energy, or clean his CRT monitor.',
     'pantry.info.p3': '• CRDT Convergence: Stock is mathematically synchronized via a zero-conflict P2P mesh (PN-Counter).',
     
