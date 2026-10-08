@@ -77,13 +77,12 @@ export class NetworkMesh {
       'wss://broker.emqx.io:8084/mqtt'
     ];
 
-    // 2. High-uptime Tier-1 Nostr Relays: sub-400ms global latency (Damus excluded due to aggressive rate-limits)
+    // 2. High-uptime Tier-1 Nostr Relays: sub-400ms global latency (flaky/rate-limited relays excluded)
     const nostrRelays = [
-      'wss://nos.lol',
-      'wss://nostr.mom',
       'wss://relay.primal.net',
       'wss://purplerelay.com',
-      'wss://bucket.coracle.social'
+      'wss://bucket.coracle.social',
+      'wss://relay.snort.social'
     ];
 
     await Promise.allSettled([
@@ -112,9 +111,16 @@ export class NetworkMesh {
         this._connectNostrRelay(url);
       }
 
-      // Mobile PWA Lifecycle: Instant reconnect on foreground / unlock
+      // Mobile & Desktop Lifecycle: Instant clean reconnect on foreground / unlock / network restoration
       if (typeof window !== 'undefined') {
         const handleWake = () => {
+          if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+          // Clear any backoff timers so we reconnect immediately when connection restores
+          for (const timer of this.nostrRetryTimers.values()) {
+            clearTimeout(timer);
+          }
+          this.nostrRetryTimers.clear();
+          this.nostrFailureCounts.clear();
           this._reconnectDeadSockets();
           this.broadcastState();
           this._emitGossip('REQUEST_SYNC', { senderId: this.localPeerId });
@@ -133,6 +139,8 @@ export class NetworkMesh {
 
   _connectNostrRelay(url) {
     if (typeof WebSocket === 'undefined') return;
+    // Guard: Never attempt WebSocket connection when browser is offline
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
 
     // Guard: Do not reconnect if already open or connecting
     const existing = this.nostrSockets.find(s => s._url === url);
@@ -172,6 +180,11 @@ export class NetworkMesh {
         const idx = this.nostrSockets.indexOf(ws);
         if (idx !== -1) this.nostrSockets.splice(idx, 1);
         if (!this._isDestroyed) {
+          // If browser is offline, don't schedule retries (window 'online' event will trigger)
+          if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            return;
+          }
+
           const failures = (this.nostrFailureCounts.get(url) || 0) + 1;
           this.nostrFailureCounts.set(url, failures);
 
@@ -195,6 +208,7 @@ export class NetworkMesh {
   }
 
   _reconnectDeadSockets() {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
     if (!this.nostrRelayUrls) return;
     const activeUrls = new Set(this.nostrSockets.filter(s => s.readyState === 1 || s.readyState === 0).map(s => s._url));
     for (const url of this.nostrRelayUrls) {
@@ -212,7 +226,7 @@ export class NetworkMesh {
       const config = {
         appId: 'bibo-16bit-sovereign-mesh',
         relayUrls: relays,
-        relayConfig: { urls: relays, redundancy: 2 },
+        relayConfig: { urls: relays, redundancy: 2, warnOnRelayFailure: false },
         rtcConfig,
         trickleIce: true
       };
