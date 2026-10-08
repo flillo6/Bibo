@@ -27,7 +27,7 @@ const STATIC_ASSETS = [
   './js/engine/MonotonicWorkerTimer.js',
   './js/knowledge/StarterPack.js',
   './js/knowledge/KnowledgeEngine.js',
-  './js/network/NetworkMesh.js',
+  './js/network/NetworkMesh.js?v=7.5',
   './js/storage/ProfileStorage.js',
   './js/storage/SovereignCrypto.js',
   './js/vendor/trystero-mqtt.js',
